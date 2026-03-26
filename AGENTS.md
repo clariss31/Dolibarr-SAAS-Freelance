@@ -41,6 +41,7 @@ Respecter scrupuleusement l'architecture suivante :
 * [cite_start]**Dépendances** : S'assurer régulièrement que les dépendances sont à jour.
 * [cite_start]**Gitignore** : Vérifier à chaque étape que le `.gitignore` est à jour afin de ne publier aucun fichier inutile ni aucune information sensible.
 * [cite_start]**Styles & CSS** : Centraliser les variables globales (couleurs, polices, thèmes de base) dans `app/globals.css` via l'at-rule `@theme inline`. Ne pas créer de fichiers `.css` séparés par composant. Privilégier exclusivement l'utilisation des classes utilitaires intégrées à Tailwind CSS dans les composants React.
+* [cite_start]**Langue & Routage** : Les noms des dossiers (routes) et des fichiers doivent **impérativement être en anglais** (ex: `third-parties`, `billing-payments`). Le texte affiché à l'utilisateur reste en français.
 
 ## 🗺️ Périmètre des Pages (6 total)
 1. **Dashboard** : KPIs financiers (CA, impayés) et activités récentes.
