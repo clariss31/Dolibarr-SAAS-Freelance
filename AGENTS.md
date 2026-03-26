@@ -38,6 +38,9 @@ Respecter scrupuleusement l'architecture suivante :
 * [cite_start]**Naming** : Fonctions et composants nommés de manière explicite et rigoureuse.
 * [cite_start]**Commentaires** : Commenter le code uniquement lorsque la logique métier est complexe.
 * [cite_start]**Justification** : Chaque nouvelle librairie ajoutée devra être justifiée.
+* [cite_start]**Dépendances** : S'assurer régulièrement que les dépendances sont à jour.
+* [cite_start]**Gitignore** : Vérifier à chaque étape que le `.gitignore` est à jour afin de ne publier aucun fichier inutile ni aucune information sensible.
+* [cite_start]**Styles & CSS** : Centraliser les variables globales (couleurs, polices, thèmes de base) dans `app/globals.css` via l'at-rule `@theme inline`. Ne pas créer de fichiers `.css` séparés par composant. Privilégier exclusivement l'utilisation des classes utilitaires intégrées à Tailwind CSS dans les composants React.
 
 ## 🗺️ Périmètre des Pages (6 total)
 1. **Dashboard** : KPIs financiers (CA, impayés) et activités récentes.
