@@ -1,0 +1,400 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api } from '../../../../services/api';
+
+export default function CreateThirdPartyPage() {
+  const router = useRouter();
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    url: '',
+    address: '',
+    zip: '',
+    town: '',
+    country: '',
+    tva_intra: '',
+    idprof2: '',
+    code_client: '',
+    t_type: 'client',
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+
+    const clientStatus =
+      formData.t_type === 'client'
+        ? 1
+        : formData.t_type === 'prospect'
+          ? 2
+          : 0;
+    const fournisseurStatus = formData.t_type === 'fournisseur' ? 1 : 0;
+
+    const payload: any = {
+      ...formData,
+      client: clientStatus,
+      fournisseur: fournisseurStatus,
+    };
+    delete payload.t_type;
+
+    // Supprimer les chaînes vides ("") pour éviter que Dolibarr ne plante
+    const cleanPayload = Object.fromEntries(
+      Object.entries(payload).filter(([_, v]) => v !== '')
+    );
+
+    // Essentiel pour Dolibarr: Forcer la génération automatique des codes si non fournis
+    if (clientStatus > 0 && !cleanPayload.code_client) {
+      cleanPayload.code_client = '-1';
+    }
+    if (fournisseurStatus > 0 && !cleanPayload.code_fournisseur) {
+      cleanPayload.code_fournisseur = '-1';
+    }
+
+    try {
+      const response = await api.post(`/thirdparties`, cleanPayload);
+      const newId = response.data;
+      router.push(`/third-parties/${newId}`);
+    } catch (err: any) {
+      setError(
+        err.response?.data?.error?.message ||
+          'Erreur inattendue lors de la création.'
+      );
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-8">
+      <div className="border-border flex items-center justify-between border-b pb-4">
+        <div>
+          <h1 className="text-foreground text-2xl font-bold tracking-tight">
+            Nouveau tiers
+          </h1>
+          <p className="text-muted mt-1 text-sm">
+            Ajouter une nouvelle fiche entreprise ou contact.
+          </p>
+        </div>
+        <div className="flex items-center space-x-6">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="text-muted hover:text-foreground text-sm font-medium transition-colors"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
+          {error}
+        </div>
+      )}
+
+      <form
+        onSubmit={handleSubmit}
+        className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
+      >
+        {/* Informations de base */}
+        <div className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base leading-7 font-semibold">
+            Informations Principales
+          </h2>
+          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="name"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Nom / Raison Sociale *
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  required
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="code_client"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Code Client
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  id="code_client"
+                  name="code_client"
+                  value={formData.code_client}
+                  onChange={handleChange}
+                  placeholder="Optionnel (Laissé vide: généré auto)"
+                  className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Classification / Type */}
+        <div className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base leading-7 font-semibold">
+            Classification (Type de Tiers)
+          </h2>
+          <div className="mt-4 max-w-md">
+            <label
+              htmlFor="t_type"
+              className="text-foreground block text-sm leading-6 font-medium"
+            >
+              Type Exclusif
+            </label>
+            <div className="mt-2">
+              <select
+                id="t_type"
+                name="t_type"
+                value={formData.t_type}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2.5 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+              >
+                <option value="client">Client</option>
+                <option value="prospect">Prospect</option>
+                <option value="fournisseur">Fournisseur</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact */}
+        <div className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base leading-7 font-semibold">
+            Coordonnées de Contact
+          </h2>
+          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+            <div>
+              <label
+                htmlFor="email"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Email
+              </label>
+              <div className="mt-2">
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="phone"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Téléphone
+              </label>
+              <div className="mt-2">
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="url"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Site Web (URL)
+              </label>
+              <div className="mt-2">
+                <input
+                  type="url"
+                  id="url"
+                  name="url"
+                  value={formData.url}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Adresse */}
+        <div className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base leading-7 font-semibold">
+            Adresse Postale
+          </h2>
+          <div className="mt-4 space-y-4">
+            <div>
+              <label
+                htmlFor="address"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Rue / Voie
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+              <div>
+                <label
+                  htmlFor="zip"
+                  className="text-foreground block text-sm leading-6 font-medium"
+                >
+                  Code Postal
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="zip"
+                    name="zip"
+                    value={formData.zip}
+                    onChange={handleChange}
+                    className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="town"
+                  className="text-foreground block text-sm leading-6 font-medium"
+                >
+                  Ville
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="town"
+                    name="town"
+                    value={formData.town}
+                    onChange={handleChange}
+                    className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="country"
+                  className="text-foreground block text-sm leading-6 font-medium"
+                >
+                  Pays
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="country"
+                    name="country"
+                    value={formData.country}
+                    onChange={handleChange}
+                    className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Legal */}
+        <div className="pb-2">
+          <h2 className="text-foreground text-base leading-7 font-semibold">
+            Identifiants Légaux
+          </h2>
+          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="tva_intra"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Numéro de TVA
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  id="tva_intra"
+                  name="tva_intra"
+                  value={formData.tva_intra}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="idprof2"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                SIRET
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  id="idprof2"
+                  name="idprof2"
+                  value={formData.idprof2}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions Submit */}
+        <div className="border-border flex items-center justify-end space-x-4 border-t pt-4">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            disabled={saving}
+            className="text-muted hover:text-foreground text-sm leading-6 font-medium disabled:opacity-50"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-primary hover:bg-primary-hover focus-visible:outline-primary inline-flex justify-center rounded-md px-6 py-2 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+          >
+            {saving ? 'Création en cours...' : 'Créer le tiers'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
