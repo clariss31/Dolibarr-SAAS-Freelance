@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { ApiError } from '../../../../types/dolibarr';
+import ProposalLines, { LocalLine } from '../../../../components/ui/ProposalLines';
 
 interface ThirdPartyOption {
   id: string;
@@ -25,6 +26,7 @@ export default function CreateCommercePage() {
     fin_validite: fifteenDaysLater.toISOString().split('T')[0],
   });
 
+  const [lines, setLines] = useState<LocalLine[]>([]);
   const [thirdParties, setThirdParties] = useState<ThirdPartyOption[]>([]);
   const [loadingThirdParties, setLoadingThirdParties] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,7 +42,6 @@ export default function CreateCommercePage() {
   useEffect(() => {
     const fetchThirdParties = async () => {
       try {
-        // On récupère une liste large de tiers (clients/prospects)
         const response = await api.get('/thirdparties?sortfield=t.nom&sortorder=ASC&limit=500');
         if (response.data && Array.isArray(response.data)) {
           setThirdParties(response.data);
@@ -74,12 +75,21 @@ export default function CreateCommercePage() {
       socid: parseInt(formData.socid, 10),
       datep: dateStringToTimestamp(formData.datep),
       fin_validite: dateStringToTimestamp(formData.fin_validite),
+      // Inclure les lignes directement dans le payload principal
+      // (l'endpoint POST /proposals/{id}/lines ignore le body JSON dans cette version de Dolibarr)
+      lines: lines.map((line) => ({
+        fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
+        product_type: line.product_type,
+        desc: line.label,
+        qty: Number(line.qty),
+        subprice: Number(line.subprice),
+        tva_tx: Number(line.tva_tx),
+      })),
     };
 
     try {
       const response = await api.post('/proposals', payload);
-      const newProposalId = response.data; // Dolibarr POST endpoints usually return the new ID directly
-      // Redirection vers la fiche détail du nouveau devis
+      const newProposalId = response.data as string | number;
       router.push(`/commerce/${newProposalId}`);
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
@@ -196,6 +206,9 @@ export default function CreateCommercePage() {
             </div>
           </div>
         </div>
+
+        {/* Lignes de produits / services */}
+        <ProposalLines lines={lines} onChange={setLines} />
 
         <div className="border-border flex items-center justify-end border-t pt-6">
           <button

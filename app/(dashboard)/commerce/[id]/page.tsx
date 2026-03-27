@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../services/api';
-import { Proposal, ApiError, ThirdParty } from '../../../../types/dolibarr';
+import { Proposal, ProposalLine, ApiError, ThirdParty } from '../../../../types/dolibarr';
 
 export default function CommerceDetailsPage() {
   const router = useRouter();
@@ -234,32 +234,70 @@ export default function CommerceDetailsPage() {
           </div>
         </div>
 
-        {/* Tarification */}
+        {/* Lignes du devis */}
         <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md sm:col-span-2">
           <div className="border-border bg-background border-b px-5 py-4">
             <h3 className="text-foreground text-base leading-6 font-semibold">
-              Tarification globale
+              Lignes du devis
             </h3>
           </div>
-          <div className="space-y-4 p-5">
-            <div className="bg-background border-border flex flex-col justify-between space-y-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:space-y-0">
-              <div>
-                <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                  Total HT
-                </p>
-                <p className="text-foreground mt-1 text-2xl font-bold">
-                  {formatPrice(proposal.total_ht)}
-                </p>
-              </div>
-              <div className="sm:text-right">
-                <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                  Total TTC
-                </p>
-                <p className="text-foreground mt-1 text-lg font-medium">
-                  {formatPrice(proposal.total_ttc)}
-                </p>
-              </div>
-            </div>
+          <div className="p-5">
+            {proposal.lines && proposal.lines.length > 0 ? (
+              <>
+                <div className="overflow-x-auto rounded-lg">
+                  <table className="ring-border w-full text-sm ring-1">
+                    <thead className="bg-background">
+                      <tr>
+                        <th scope="col" className="text-foreground px-4 py-3 text-left font-medium">Désignation</th>
+                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Prix unit. HT</th>
+                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">TVA %</th>
+                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Qté</th>
+                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Sous-total HT</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-border divide-y">
+                      {proposal.lines.map((line: ProposalLine, i: number) => {
+                        const label = line.product_label || line.label || line.description || `Ligne ${i + 1}`;
+                        const unitPrice = Number(line.subprice ?? line.up ?? 0);
+                        const qty = Number(line.qty);
+                        const tva = Number(line.tva_tx);
+                        const totalHt = Number(line.total_ht) || parseFloat((qty * unitPrice).toFixed(2));
+                        return (
+                          <tr key={line.rowid ?? line.id ?? i} className="hover:bg-surface/50 transition-colors">
+                            <td className="text-foreground px-4 py-3">{label}</td>
+                            <td className="text-foreground px-4 py-3 text-right">{formatPrice(unitPrice)}</td>
+                            <td className="text-muted px-4 py-3 text-right">{tva} %</td>
+                            <td className="text-foreground px-4 py-3 text-right">{qty}</td>
+                            <td className="text-foreground px-4 py-3 text-right font-medium">{formatPrice(totalHt)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Récapitulatif totaux */}
+                <dl className="bg-background border-border divide-border mt-4 divide-y rounded-lg border">
+                  <div className="flex justify-between px-4 py-3 text-sm">
+                    <dt className="text-muted">Total HT</dt>
+                    <dd className="text-foreground font-medium">{formatPrice(proposal.total_ht)}</dd>
+                  </div>
+                  <div className="flex justify-between px-4 py-3 text-sm">
+                    <dt className="text-muted">TVA</dt>
+                    <dd className="text-foreground font-medium">
+                      {formatPrice(
+                        Number(proposal.total_ttc ?? 0) - Number(proposal.total_ht ?? 0)
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between px-4 py-3 text-sm font-semibold">
+                    <dt className="text-foreground">Total TTC</dt>
+                    <dd className="text-foreground">{formatPrice(proposal.total_ttc)}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <p className="text-muted py-6 text-center text-sm">Aucune ligne sur ce devis.</p>
+            )}
           </div>
         </div>
       </div>

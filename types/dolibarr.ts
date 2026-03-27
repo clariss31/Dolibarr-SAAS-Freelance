@@ -43,6 +43,21 @@ export interface Product {
   type: string | number;   // 0 = produit, 1 = service
 }
 
+export interface ProposalLine {
+  id?: string;
+  rowid?: string;              // Dolibarr retourne parfois cet alias
+  fk_product?: string | number;
+  label?: string;              // Peut être vide si ligne produit
+  product_label?: string;      // Nom du produit (champ réel de l'API Dolibarr)
+  description?: string;        // Description libre
+  qty: number | string;        // Dolibarr retourne des strings
+  subprice: number | string;   // Prix unitaire HT
+  up?: number | string;        // Alias de subprice dans certaines versions
+  tva_tx: number | string;     // Taux de TVA (%)
+  total_ht: number | string;
+  total_ttc: number | string;
+}
+
 export interface Proposal {
   id: string;
   ref: string;
@@ -55,4 +70,5 @@ export interface Proposal {
   total_ht: number | string;
   total_ttc?: number | string;
   statut: string | number; // 0=Brouillon, 1=Ouvert, 2=Signée, 3=Non Signée, 4=Facturée
+  lines?: ProposalLine[];
 }

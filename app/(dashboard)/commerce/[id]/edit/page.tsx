@@ -3,7 +3,51 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
-import { Proposal, ApiError } from '../../../../../types/dolibarr';
+import {
+  Proposal,
+  ProposalLine,
+  ApiError,
+} from '../../../../../types/dolibarr';
+import ProposalLines, {
+  LocalLine,
+} from '../../../../../components/ui/ProposalLines';
+
+/** Transforme une ligne API Dolibarr en ligne locale (avec clé unique React).
+ *  Dolibarr utilise `product_label` pour le nom du produit et renvoie les
+ *  valeurs numériques sous forme de strings — on normalise tout ici. */
+function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
+  // Résolution du libellé : Dolibarr stocke le nom du produit dans product_label
+  const resolvedLabel: string =
+    line.product_label ||
+    line.label ||
+    line.description ||
+    `Ligne ${index + 1}`;
+  // Résolution de l'ID de ligne (rowid ou id selon la version de l'API)
+  const lineId = line.id ?? line.id;
+  // Prix unitaire : subprice ou son alias `up`
+  const unitPrice = Number(line.subprice ?? line.up ?? 0);
+  const qty = Number(line.qty) || 1;
+  const tva = Number(line.tva_tx) || 0;
+  // Recalcul local si les totaux fournis par l'API sont à 0
+  const totalHt =
+    Number(line.total_ht) || parseFloat((qty * unitPrice).toFixed(2));
+  const totalTtc =
+    Number(line.total_ttc) ||
+    parseFloat((totalHt * (1 + tva / 100)).toFixed(2));
+
+  return {
+    _key: `existing-${lineId ?? index}-${Date.now()}`,
+    id: lineId ? String(lineId) : undefined,
+    fk_product: line.fk_product ? String(line.fk_product) : undefined,
+    product_type: 0, // Valeur par défaut — Dolibarr le remplit depuis fk_product
+    label: resolvedLabel,
+    qty,
+    subprice: unitPrice,
+    tva_tx: tva,
+    total_ht: totalHt,
+    total_ttc: totalTtc,
+  };
+}
 
 export default function EditCommercePage() {
   const router = useRouter();
@@ -14,9 +58,10 @@ export default function EditCommercePage() {
     statut: '0',
     datep: '',
     fin_validite: '',
-    total_ht: '',
   });
 
+  const [lines, setLines] = useState<LocalLine[]>([]);
+  const [originalLineIds, setOriginalLineIds] = useState<string[]>([]);
   const [proposalRef, setProposalRef] = useState('');
   const [clientName, setClientName] = useState('Chargement...');
   const [loading, setLoading] = useState(true);
@@ -28,7 +73,6 @@ export default function EditCommercePage() {
   const timestampToDateString = (ts: string | number | undefined) => {
     if (!ts) return '';
     const date = new Date(Number(ts) * 1000);
-    // Pad months and days
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
@@ -52,8 +96,30 @@ export default function EditCommercePage() {
             statut: String(d.statut ?? '0'),
             datep: timestampToDateString(d.datep),
             fin_validite: timestampToDateString(d.fin_validite),
-            total_ht: d.total_ht ? String(d.total_ht) : '',
           });
+
+          // Chargement des lignes existantes
+          if (d.lines && Array.isArray(d.lines) && d.lines.length > 0) {
+            const localLines = d.lines.map(apiLineToLocal);
+            setLines(localLines);
+            setOriginalLineIds(
+              d.lines.map((l) => l.id).filter(Boolean) as string[]
+            );
+          } else {
+            // Fallback : charger via endpoint dédié
+            try {
+              const linesResp = await api.get(`/proposals/${id}/lines`);
+              if (linesResp.data && Array.isArray(linesResp.data)) {
+                const apiLines = linesResp.data as ProposalLine[];
+                setLines(apiLines.map(apiLineToLocal));
+                setOriginalLineIds(
+                  apiLines.map((l) => l.id).filter(Boolean) as string[]
+                );
+              }
+            } catch {
+              // Pas de lignes existantes
+            }
+          }
 
           // Résolution du nom du Tiers
           if (d.thirdparty?.name) {
@@ -75,7 +141,7 @@ export default function EditCommercePage() {
             setClientName('Inconnu');
           }
         }
-      } catch (err: unknown) {
+      } catch {
         setError('Erreur lors de la récupération des données du devis.');
       } finally {
         setLoading(false);
@@ -95,18 +161,46 @@ export default function EditCommercePage() {
     setSaving(true);
     setError('');
 
+    // Payload de base pour l'en-tête du devis (dates, statut)
     const payload: Record<string, unknown> = {
       statut: parseInt(formData.statut, 10),
       datep: dateStringToTimestamp(formData.datep),
       fin_validite: dateStringToTimestamp(formData.fin_validite),
     };
 
-    if (formData.total_ht !== '') {
-      payload.total_ht = parseFloat(formData.total_ht);
-    }
-
     try {
+      // 1. Mise à jour de l'en-tête
       await api.put(`/proposals/${id}`, payload);
+
+      // 2. Si le devis est en brouillon, synchroniser les lignes
+      if (formData.statut === '0') {
+        // A. Suppression de toutes les lignes existantes
+        // Note : On utilise l'ID conservé au chargement initial
+        const currentOriginalIds = [...originalLineIds];
+        for (const lineId of currentOriginalIds) {
+          try {
+            await api.delete(`/proposals/${id}/lines/${lineId}`);
+          } catch (err) {
+            console.warn(
+              `Ligne ${lineId} déjà absente ou impossible à supprimer`
+            );
+          }
+        }
+
+        // B. Ajout de chaque ligne une par une
+        // On utilise /line (singulier) pour éviter les problèmes de structure de tableau imbriqué
+        for (const line of lines) {
+          await api.post(`/proposals/${id}/line`, {
+            fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
+            product_type: line.product_type,
+            desc: line.label,
+            qty: Number(line.qty),
+            subprice: Number(line.subprice),
+            tva_tx: Number(line.tva_tx),
+          });
+        }
+      }
+
       router.push(`/commerce/${id}`);
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
@@ -151,7 +245,7 @@ export default function EditCommercePage() {
     );
   }
 
-  // Le devis n'est modifiable au niveau du prix que s'il est un brouillon (0)
+  // Les lignes ne sont modifiables que si le devis est en brouillon
   const isDraft = formData.statut === '0';
 
   return (
@@ -163,7 +257,7 @@ export default function EditCommercePage() {
             Modifier le devis {proposalRef}
           </h1>
           <p className="text-muted mt-1 text-sm">
-            Modification de l'état, dates et montants.
+            Modification de l'état, des dates et des lignes du devis.
           </p>
         </div>
         <div className="flex items-center space-x-6">
@@ -196,7 +290,7 @@ export default function EditCommercePage() {
         className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
       >
         <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-          {/* Client Assoçié (Lecture Seule) */}
+          {/* Client Associé (Lecture Seule) */}
           <div className="sm:col-span-2">
             <label
               htmlFor="clientName"
@@ -281,32 +375,17 @@ export default function EditCommercePage() {
               />
             </div>
           </div>
-
-          {/* Montant HT */}
-          <div className="sm:col-span-2">
-            <label
-              htmlFor="total_ht"
-              className="text-foreground block text-sm leading-6 font-medium"
-            >
-              Montant HT
-            </label>
-            <div className="relative mt-2 rounded-md shadow-sm sm:max-w-xs">
-              <input
-                type="number"
-                step="0.01"
-                id="total_ht"
-                name="total_ht"
-                disabled={!isDraft}
-                value={formData.total_ht}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary disabled:bg-muted/10 block w-full rounded-md border-0 px-3 py-2 pr-10 ring-1 ring-inset focus:ring-2 focus:ring-inset disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm sm:leading-6"
-              />
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <span className="text-muted sm:text-sm">€</span>
-              </div>
-            </div>
-          </div>
         </div>
+
+        {/* Lignes de produits / services */}
+        <ProposalLines lines={lines} onChange={setLines} disabled={!isDraft} />
+
+        {!isDraft && (
+          <p className="text-muted -mt-2 text-xs">
+            Les lignes ne peuvent être modifiées que sur un devis en statut{' '}
+            <strong>Brouillon</strong>.
+          </p>
+        )}
 
         <div className="border-border flex items-center justify-end border-t pt-6">
           <button
