@@ -90,8 +90,8 @@ export default function EditThirdPartyPage() {
     delete payload.t_type;
 
     try {
-      await api.put(`/thirdparties/${id}`, payload);
-      router.push(`/third-parties/${id}`);
+      await api.put(`/thirdparties/${id}`, payload); // Mise à jour du tiers
+      router.push(`/third-parties/${id}`); // Redirection vers la fiche du tiers
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
       setError(
@@ -119,7 +119,7 @@ export default function EditThirdPartyPage() {
       const apiErr = err as Error & ApiError;
       setError(
         apiErr.response?.data?.error?.message ||
-          'Impossible de supprimer ce Tiers. Il est probablement lié à des factures ou propositions commerciales existantes.'
+          'Impossible de supprimer ce tiers. Il est probablement lié à des factures ou propositions commerciales existantes.'
       );
       setDeleting(false);
     }
@@ -140,7 +140,7 @@ export default function EditThirdPartyPage() {
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            Modifier le Tiers
+            Modifier le tiers
           </h1>
           <p className="text-muted mt-1 text-sm">
             Gestion complète de la fiche et suppression.
@@ -177,7 +177,7 @@ export default function EditThirdPartyPage() {
         {/* Informations de base */}
         <div className="border-border border-b pb-6">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Informations Principales
+            Informations principales
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>
@@ -185,7 +185,7 @@ export default function EditThirdPartyPage() {
                 htmlFor="name"
                 className="text-foreground block text-sm leading-6 font-medium"
               >
-                Nom / Raison Sociale *
+                Nom / Raison sociale *
               </label>
               <div className="mt-2">
                 <input
@@ -204,7 +204,7 @@ export default function EditThirdPartyPage() {
                 htmlFor="code_client"
                 className="text-foreground block text-sm leading-6 font-medium"
               >
-                Code Client
+                Code client
               </label>
               <div className="mt-2">
                 <input
@@ -224,7 +224,7 @@ export default function EditThirdPartyPage() {
         {/* Classification / Type */}
         <div className="border-border border-b pb-6">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Classification (Type de Tiers)
+            Classification
           </h2>
           <div className="mt-4 max-w-md">
             <label
@@ -252,7 +252,7 @@ export default function EditThirdPartyPage() {
         {/* Contact */}
         <div className="border-border border-b pb-6">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Coordonnées de Contact
+            Coordonnées de contact
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
             <div>
@@ -296,7 +296,7 @@ export default function EditThirdPartyPage() {
                 htmlFor="url"
                 className="text-foreground block text-sm leading-6 font-medium"
               >
-                Site Web (URL)
+                Site web (URL)
               </label>
               <div className="mt-2">
                 <input
@@ -456,9 +456,7 @@ export default function EditThirdPartyPage() {
             disabled={saving || deleting}
             className="bg-primary hover:bg-primary-hover focus-visible:outline-primary inline-flex justify-center rounded-md px-6 py-2 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
           >
-            {saving
-              ? 'Enregistrement en cours...'
-              : 'Enregistrer toutes les modifications'}
+            {saving ? 'Enregistrement en cours...' : 'Enregistrer'}
           </button>
         </div>
       </form>

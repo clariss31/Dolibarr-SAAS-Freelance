@@ -5,23 +5,6 @@ import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
 import { ThirdParty, ApiError } from '../../../types/dolibarr';
 
-function EditIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
 export default function ThirdPartiesPage() {
   const router = useRouter();
   const [tiers, setTiers] = useState<ThirdParty[]>([]);
@@ -210,19 +193,13 @@ export default function ThirdPartiesPage() {
                 >
                   Téléphone
                 </th>
-                <th
-                  scope="col"
-                  className="relative w-[10%] py-3.5 pr-4 pl-3 sm:pr-6"
-                >
-                  <span className="sr-only">Actions</span>
-                </th>
               </tr>
             </thead>
             <tbody className="divide-border bg-surface divide-y">
               {loading && tiers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={4}
                     className="text-muted py-10 text-center text-sm"
                   >
                     Recherche en cours...
@@ -231,7 +208,7 @@ export default function ThirdPartiesPage() {
               ) : tiers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={4}
                     className="text-muted py-10 text-center text-sm"
                   >
                     Aucun tiers trouvé ne correspond à vos critères.
@@ -275,18 +252,6 @@ export default function ThirdPartiesPage() {
                       ) : (
                         '-'
                       )}
-                    </td>
-                    <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/third-parties/${tier.id}/edit`);
-                        }}
-                        className="text-primary hover:text-primary-hover transition-colors focus:outline-none"
-                        title="Modifier ce tiers"
-                      >
-                        <EditIcon className="inline-block h-5 w-5" />
-                      </button>
                     </td>
                   </tr>
                 ))

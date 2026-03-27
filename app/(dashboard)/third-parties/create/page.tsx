@@ -38,11 +38,7 @@ export default function CreateThirdPartyPage() {
     setError('');
 
     const clientStatus =
-      formData.t_type === 'client'
-        ? 1
-        : formData.t_type === 'prospect'
-          ? 2
-          : 0;
+      formData.t_type === 'client' ? 1 : formData.t_type === 'prospect' ? 2 : 0;
     const fournisseurStatus = formData.t_type === 'fournisseur' ? 1 : 0;
 
     const payload: Record<string, unknown> = {
@@ -66,9 +62,9 @@ export default function CreateThirdPartyPage() {
     }
 
     try {
-      const response = await api.post(`/thirdparties`, cleanPayload);
-      const newId = response.data;
-      router.push(`/third-parties/${newId}`);
+      const response = await api.post(`/thirdparties`, cleanPayload); //Création du tiers
+      const newId = response.data; //Récupération de l'ID du tiers créé
+      router.push(`/third-parties/${newId}`); //Redirection vers la page de détails du tiers
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
       setError(
