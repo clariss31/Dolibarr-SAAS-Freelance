@@ -181,6 +181,7 @@ export default function CommercePage() {
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           <button
             type="button"
+            onClick={() => router.push('/commerce/create')}
             className="bg-primary hover:bg-primary-hover focus-visible:outline-primary block rounded-md px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             + Nouveau devis
