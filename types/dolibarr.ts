@@ -50,9 +50,9 @@ export interface Proposal {
   thirdparty?: { name?: string };
   soc_name?: string;
   name?: string;
-  proposal_date?: number | string; // Date de proposition (Timestamp)
-  end_date?: number | string; // Date de fin (Timestamp)
+  datep?: number | string; // Date de proposition (Timestamp)
+  fin_validite?: number | string; // Date de fin (Timestamp)
   total_ht: number | string;
   total_ttc?: number | string;
-  status: string | number; // 0=Brouillon, 1=Ouvert, 2=Signée, 3=Non Signée, 4=Facturée
+  statut: string | number; // 0=Brouillon, 1=Ouvert, 2=Signée, 3=Non Signée, 4=Facturée
 }

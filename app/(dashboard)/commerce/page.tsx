@@ -316,10 +316,11 @@ export default function CommercePage() {
                 proposals.map((proposal) => (
                   <tr
                     key={proposal.id}
-                    className="hover:bg-muted/5 transition-colors"
+                    onClick={() => router.push(`/commerce/${proposal.id}`)}
+                    className="hover:bg-background/80 cursor-pointer transition-colors"
                   >
                     <td className="py-4 pr-3 pl-4 text-sm font-medium sm:pl-6">
-                      <span className="text-foreground cursor-pointer transition-colors hover:underline">
+                      <span className="text-foreground">
                         {proposal.ref}
                       </span>
                     </td>
@@ -327,16 +328,16 @@ export default function CommercePage() {
                       {getThirdPartyName(proposal)}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
-                      {formatDate(proposal.proposal_date)}
+                      {formatDate(proposal.datep)}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
-                      {formatDate(proposal.end_date)}
+                      {formatDate(proposal.fin_validite)}
                     </td>
                     <td className="text-foreground px-3 py-4 text-right text-sm whitespace-nowrap">
                       {formatPrice(proposal.total_ht)}
                     </td>
                     <td className="px-3 py-4 text-center text-sm whitespace-nowrap">
-                      {getStatusBadge(proposal.status)}
+                      {getStatusBadge(proposal.statut)}
                     </td>
                   </tr>
                 ))
