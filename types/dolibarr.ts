@@ -42,3 +42,17 @@ export interface Product {
   tobuy: string | number;  // 1 = en achat, 0 = hors achat
   type: string | number;   // 0 = produit, 1 = service
 }
+
+export interface Proposal {
+  id: string;
+  ref: string;
+  socid: string | number;
+  thirdparty?: { name?: string };
+  soc_name?: string;
+  name?: string;
+  proposal_date?: number | string; // Date de proposition (Timestamp)
+  end_date?: number | string; // Date de fin (Timestamp)
+  total_ht: number | string;
+  total_ttc?: number | string;
+  status: string | number; // 0=Brouillon, 1=Ouvert, 2=Signée, 3=Non Signée, 4=Facturée
+}
