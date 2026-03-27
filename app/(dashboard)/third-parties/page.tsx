@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
+import { ThirdParty, ApiError } from '../../../types/dolibarr';
 
 function EditIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -19,15 +20,6 @@ function EditIcon(props: React.SVGProps<SVGSVGElement>) {
       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </svg>
   );
-}
-
-interface ThirdParty {
-  id: string;
-  name: string;
-  client: string | number;
-  fournisseur: string | number;
-  email: string | null;
-  phone: string | null;
 }
 
 export default function ThirdPartiesPage() {
@@ -83,8 +75,9 @@ export default function ThirdPartiesPage() {
         setTiers([]);
         setHasMore(false);
       }
-    } catch (err: any) {
-      if (err.response?.status === 404) {
+    } catch (err: unknown) {
+      const apiErr = err as Error & ApiError;
+      if (apiErr.response?.status === 404) {
         // 404 means no records found for these filters/page
         setTiers([]);
         setHasMore(false);

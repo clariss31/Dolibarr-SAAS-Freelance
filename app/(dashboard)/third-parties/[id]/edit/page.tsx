@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
+import { ApiError } from '../../../../../types/dolibarr';
 
 export default function EditThirdPartyPage() {
   const router = useRouter();
@@ -76,7 +77,7 @@ export default function EditThirdPartyPage() {
     setError('');
 
     // Le serveur de Dolibarr attend des Types dissociés pour Client et Fournisseur
-    const payload = {
+    const payload: Record<string, unknown> = {
       ...formData,
       client:
         formData.t_type === 'client'
@@ -86,14 +87,15 @@ export default function EditThirdPartyPage() {
             : 0,
       fournisseur: formData.t_type === 'fournisseur' ? 1 : 0,
     };
-    delete (payload as any).t_type;
+    delete payload.t_type;
 
     try {
       await api.put(`/thirdparties/${id}`, payload);
       router.push(`/third-parties/${id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as Error & ApiError;
       setError(
-        err.response?.data?.error?.message ||
+        apiErr.response?.data?.error?.message ||
           'Erreur inattendue lors de la mise à jour.'
       );
       setSaving(false);
@@ -113,9 +115,10 @@ export default function EditThirdPartyPage() {
     try {
       await api.delete(`/thirdparties/${id}`);
       router.push('/third-parties');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as Error & ApiError;
       setError(
-        err.response?.data?.error?.message ||
+        apiErr.response?.data?.error?.message ||
           'Impossible de supprimer ce Tiers. Il est probablement lié à des factures ou propositions commerciales existantes.'
       );
       setDeleting(false);

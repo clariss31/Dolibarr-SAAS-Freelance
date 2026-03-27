@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
+import { ApiError } from '../../../types/dolibarr';
 
 export default function LoginPage() {
   const [login, setLogin] = useState('');
@@ -25,9 +26,10 @@ export default function LoginPage() {
       } else {
         setError('Identifiants incorrects.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as Error & ApiError;
       setError(
-        err.response?.data?.error?.message ||
+        apiErr.response?.data?.error?.message ||
         "Erreur de connexion. Vérifiez vos identifiants ou l'état de l'API."
       );
     } finally {

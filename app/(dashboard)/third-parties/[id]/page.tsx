@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { ThirdParty, ApiError } from '../../../../types/dolibarr';
 
 export default function ThirdPartyDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
   
-  const [tier, setTier] = useState<any>(null);
+  const [tier, setTier] = useState<ThirdParty | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -22,7 +23,7 @@ export default function ThirdPartyDetailsPage() {
         } else {
           setError("Tiers introuvable.");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         setError("Erreur lors de la récupération des informations du tiers.");
       } finally {
         setLoading(false);
@@ -31,7 +32,7 @@ export default function ThirdPartyDetailsPage() {
     if (id) fetchTier();
   }, [id]);
 
-  const getTierType = (tier: any) => {
+  const getTierType = (tier: ThirdParty) => {
     const types = [];
     if (String(tier.client) === '1' || String(tier.client) === '3') types.push('Client');
     if (String(tier.client) === '2' || String(tier.client) === '3') types.push('Prospect');

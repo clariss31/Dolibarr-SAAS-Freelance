@@ -10,8 +10,10 @@ const getBaseUrl = () => {
     return envUrl;
 };
 
+import { ApiError } from '../types/dolibarr';
+
 interface RequestOptions extends RequestInit {
-    data?: any;
+    data?: unknown;
 }
 
 export const api = {
@@ -63,7 +65,7 @@ export const api = {
         }
 
         if (!response.ok) {
-            const error: any = new Error(response.statusText);
+            const error = new Error(response.statusText) as Error & ApiError;
             error.response = { status: response.status, data };
             throw error;
         }
@@ -75,11 +77,11 @@ export const api = {
         return this.fetch(endpoint, { ...options, method: 'GET' });
     },
 
-    post(endpoint: string, data?: any, options?: Omit<RequestOptions, 'method' | 'data'>) {
+    post(endpoint: string, data?: unknown, options?: Omit<RequestOptions, 'method' | 'data'>) {
         return this.fetch(endpoint, { ...options, method: 'POST', data });
     },
 
-    put(endpoint: string, data?: any, options?: Omit<RequestOptions, 'method' | 'data'>) {
+    put(endpoint: string, data?: unknown, options?: Omit<RequestOptions, 'method' | 'data'>) {
         return this.fetch(endpoint, { ...options, method: 'PUT', data });
     },
 

@@ -35,6 +35,7 @@ Respecter scrupuleusement l'architecture suivante :
 * `/utils` : Fonctions utilitaires (formatage de prix/dates).
 
 ## 📝 Qualité du Code
+* [cite_start]**TypeScript Strict** : Aucun type `any` n'est toléré. Les interfaces de données et API doivent obligatoirement être déclarées en amont dans le dossier `/types`.
 * [cite_start]**Naming** : Fonctions et composants nommés de manière explicite et rigoureuse.
 * [cite_start]**Commentaires** : Commenter le code uniquement lorsque la logique métier est complexe.
 * [cite_start]**Justification** : Chaque nouvelle librairie ajoutée devra être justifiée.

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { ApiError } from '../../../../types/dolibarr';
 
 export default function CreateThirdPartyPage() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function CreateThirdPartyPage() {
           : 0;
     const fournisseurStatus = formData.t_type === 'fournisseur' ? 1 : 0;
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       ...formData,
       client: clientStatus,
       fournisseur: fournisseurStatus,
@@ -68,9 +69,10 @@ export default function CreateThirdPartyPage() {
       const response = await api.post(`/thirdparties`, cleanPayload);
       const newId = response.data;
       router.push(`/third-parties/${newId}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as Error & ApiError;
       setError(
-        err.response?.data?.error?.message ||
+        apiErr.response?.data?.error?.message ||
           'Erreur inattendue lors de la création.'
       );
       setSaving(false);
