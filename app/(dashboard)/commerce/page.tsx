@@ -12,6 +12,7 @@ export default function CommercePage() {
     Record<string, string>
   >({});
   const [loading, setLoading] = useState(true);
+  const [loadingThirdParties, setLoadingThirdParties] = useState(true);
   const [error, setError] = useState('');
 
   // Pagination
@@ -36,7 +37,8 @@ export default function CommercePage() {
           setThirdPartiesMap(dict);
         }
       })
-      .catch(() => console.error('Could not preload third parties'));
+      .catch((err) => console.error('Could not preload third parties', err))
+      .finally(() => setLoadingThirdParties(false));
   }, []);
 
   // Recherche automatique après 400ms
@@ -280,30 +282,16 @@ export default function CommercePage() {
               </tr>
             </thead>
             <tbody className="divide-border bg-surface divide-y">
-              {loading ? (
-                // Skeletons de chargement
-                [...Array(5)].map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td className="py-4 pr-3 pl-4 sm:pl-6">
-                      <div className="bg-muted/20 h-4 w-24 rounded"></div>
-                    </td>
-                    <td className="px-3 py-4">
-                      <div className="bg-muted/20 h-4 w-40 rounded"></div>
-                    </td>
-                    <td className="px-3 py-4">
-                      <div className="bg-muted/20 h-4 w-20 rounded"></div>
-                    </td>
-                    <td className="px-3 py-4">
-                      <div className="bg-muted/20 h-4 w-20 rounded"></div>
-                    </td>
-                    <td className="px-3 py-4 text-right">
-                      <div className="bg-muted/20 ml-auto h-4 w-16 rounded"></div>
-                    </td>
-                    <td className="px-3 py-4 text-center">
-                      <div className="bg-muted/20 mx-auto h-6 w-16 rounded-full"></div>
-                    </td>
-                  </tr>
-                ))
+              {loading || loadingThirdParties ? (
+                // Loader global
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="text-muted py-10 text-center text-sm"
+                  >
+                    Recherche en cours...
+                  </td>
+                </tr>
               ) : proposals.length === 0 ? (
                 <tr>
                   <td
@@ -321,9 +309,7 @@ export default function CommercePage() {
                     className="hover:bg-background/80 cursor-pointer transition-colors"
                   >
                     <td className="py-4 pr-3 pl-4 text-sm font-medium sm:pl-6">
-                      <span className="text-foreground">
-                        {proposal.ref}
-                      </span>
+                      <span className="text-foreground">{proposal.ref}</span>
                     </td>
                     <td className="text-foreground px-3 py-4 text-sm">
                       {getThirdPartyName(proposal)}
