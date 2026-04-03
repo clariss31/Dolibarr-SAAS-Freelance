@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
+import { auth } from '../../../utils/auth';
 import { ApiError } from '../../../types/dolibarr';
 
 export default function LoginPage() {
@@ -12,26 +13,41 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const apiUrl = process.env.NEXT_PUBLIC_DOLIBARR_API_URL || '';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    if (!apiUrl) {
+      setError("Configuration manquante : URL de l'API non définie.");
+      setLoading(false);
+      return;
+    }
+
     try {
+      // S'assurer que l'URL est dans le cookie pour le service API
+      auth.setAuth('', apiUrl);
+      
       const response = await api.post('/login', { login, password });
       
       if (response.data && response.data.success && response.data.success.token) {
-        localStorage.setItem('dolibarr_token', response.data.success.token);
+        auth.setAuth(response.data.success.token, apiUrl);
         router.push('/');
       } else {
         setError('Identifiants incorrects.');
       }
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-        "Erreur de connexion. Vérifiez vos identifiants ou l'état de l'API."
-      );
+      if (apiErr.response?.status === 404) {
+        setError("L'URL de l'API semble incorrecte (404).");
+      } else {
+        setError(
+          apiErr.response?.data?.error?.message ||
+          "Erreur de connexion. Vérifiez vos identifiants ou l'URL de l'API."
+        );
+      }
     } finally {
       setLoading(false);
     }

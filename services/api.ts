@@ -1,16 +1,10 @@
-/**
- * Client d'API pour Dolibarr basé sur fetch
- */
+import { auth } from '../utils/auth';
+import { ApiError } from '../types/dolibarr';
 
 const getBaseUrl = () => {
     const envUrl = process.env.NEXT_PUBLIC_DOLIBARR_API_URL || '';
-    if (typeof window !== 'undefined') {
-        return localStorage.getItem('dolibarr_api_url') || envUrl;
-    }
-    return envUrl;
+    return auth.getApiUrl() || envUrl;
 };
-
-import { ApiError } from '../types/dolibarr';
 
 interface RequestOptions extends RequestInit {
     data?: unknown;
@@ -26,12 +20,10 @@ export const api = {
             ...(options.headers as Record<string, string> || {})
         });
 
-        // Ajout du token si présent (côté client)
-        if (typeof window !== 'undefined') {
-            const token = localStorage.getItem('dolibarr_token');
-            if (token) {
-                headers.set('DOLAPIKEY', token);
-            }
+        // Ajout du token si présent
+        const token = auth.getToken();
+        if (token) {
+            headers.set('DOLAPIKEY', token);
         }
 
         const config: RequestInit = {
@@ -47,8 +39,8 @@ export const api = {
 
         // Intercepteur de réponse pour gérer l'erreur 401 (Non autorisé)
         if (response.status === 401) {
+            auth.clearAuth();
             if (typeof window !== 'undefined') {
-                localStorage.removeItem('dolibarr_token');
                 window.location.href = '/login';
             }
             throw new Error('Unauthorized');
