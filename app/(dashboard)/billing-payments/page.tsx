@@ -294,7 +294,7 @@ export default function BillingPaymentsPage() {
               </tr>
             </thead>
             <tbody className="divide-border bg-surface divide-y">
-              {(loading || loadingThirdParties) && invoices.length === 0 ? (
+              {(loading || loadingThirdParties) ? (
                 <tr>
                   <td
                     colSpan={7}
