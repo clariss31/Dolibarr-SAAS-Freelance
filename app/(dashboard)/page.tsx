@@ -20,12 +20,18 @@ export default function DashboardRootPage() {
   });
 
   // Recent Activity States
-  const [recentThirdParties, setRecentThirdParties] = useState<ThirdParty[]>([]);
+  const [recentThirdParties, setRecentThirdParties] = useState<ThirdParty[]>(
+    []
+  );
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [recentServices, setRecentServices] = useState<Product[]>([]);
   const [recentProposals, setRecentProposals] = useState<Proposal[]>([]);
-  const [recentClientInvoices, setRecentClientInvoices] = useState<Invoice[]>([]);
-  const [recentSupplierInvoices, setRecentSupplierInvoices] = useState<Invoice[]>([]);
+  const [recentClientInvoices, setRecentClientInvoices] = useState<Invoice[]>(
+    []
+  );
+  const [recentSupplierInvoices, setRecentSupplierInvoices] = useState<
+    Invoice[]
+  >([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -49,7 +55,7 @@ export default function DashboardRootPage() {
           servicesRes,
           proposalsRes,
           clientInvoicesRes,
-          supplierInvoicesRes
+          supplierInvoicesRes,
         ] = await Promise.allSettled([
           api.get('/invoices?limit=200&sortfield=t.datec&sortorder=DESC'),
           api.get('/proposals?limit=100&sqlfilters=(t.fk_statut:=:1)'),
@@ -63,42 +69,80 @@ export default function DashboardRootPage() {
         ]);
 
         // Process results
-        const newStats = { caMonthHT: 0, unpaidInvoicesCount: 0, pendingProposalsHT: 0, upcomingSupplierHT: 0 };
-        
-        if (invoicesKpiRes.status === 'fulfilled' && invoicesKpiRes.value.data) {
+        const newStats = {
+          caMonthHT: 0,
+          unpaidInvoicesCount: 0,
+          pendingProposalsHT: 0,
+          upcomingSupplierHT: 0,
+        };
+
+        if (
+          invoicesKpiRes.status === 'fulfilled' &&
+          invoicesKpiRes.value.data
+        ) {
           const invs: Invoice[] = invoicesKpiRes.value.data;
           newStats.caMonthHT = invs
-            .filter((inv) => inv.date && Number(inv.date) >= startOfMonthTs && Number(inv.statut) > 0)
+            .filter(
+              (inv) =>
+                inv.date &&
+                Number(inv.date) >= startOfMonthTs &&
+                Number(inv.statut) > 0
+            )
             .reduce((acc, inv) => acc + Number(inv.total_ht || 0), 0);
-          newStats.unpaidInvoicesCount = invs.filter((inv) => Number(inv.statut) === 1).length;
+          newStats.unpaidInvoicesCount = invs.filter(
+            (inv) => Number(inv.statut) === 1
+          ).length;
         }
 
-        if (proposalsKpiRes.status === 'fulfilled' && proposalsKpiRes.value.data) {
+        if (
+          proposalsKpiRes.status === 'fulfilled' &&
+          proposalsKpiRes.value.data
+        ) {
           const props: Proposal[] = proposalsKpiRes.value.data;
-          newStats.pendingProposalsHT = props.reduce((acc, prop) => acc + Number(prop.total_ht || 0), 0);
+          newStats.pendingProposalsHT = props.reduce(
+            (acc, prop) => acc + Number(prop.total_ht || 0),
+            0
+          );
         }
 
-        if (supplierKpiRes.status === 'fulfilled' && supplierKpiRes.value.data) {
+        if (
+          supplierKpiRes.status === 'fulfilled' &&
+          supplierKpiRes.value.data
+        ) {
           const sInvs: Invoice[] = supplierKpiRes.value.data;
-          newStats.upcomingSupplierHT = sInvs.reduce((acc, inv) => acc + Number(inv.total_ht || 0), 0);
+          newStats.upcomingSupplierHT = sInvs.reduce(
+            (acc, inv) => acc + Number(inv.total_ht || 0),
+            0
+          );
         }
 
         setStats(newStats);
 
         // Process Lists
-        if (thirdPartiesRes.status === 'fulfilled') setRecentThirdParties(thirdPartiesRes.value.data || []);
-        if (productsRes.status === 'fulfilled') setRecentProducts(productsRes.value.data || []);
-        if (servicesRes.status === 'fulfilled') setRecentServices(servicesRes.value.data || []);
-        if (proposalsRes.status === 'fulfilled') setRecentProposals(proposalsRes.value.data || []);
-        if (clientInvoicesRes.status === 'fulfilled') setRecentClientInvoices(clientInvoicesRes.value.data || []);
-        if (supplierInvoicesRes.status === 'fulfilled') setRecentSupplierInvoices(supplierInvoicesRes.value.data || []);
+        if (thirdPartiesRes.status === 'fulfilled')
+          setRecentThirdParties(thirdPartiesRes.value.data || []);
+        if (productsRes.status === 'fulfilled')
+          setRecentProducts(productsRes.value.data || []);
+        if (servicesRes.status === 'fulfilled')
+          setRecentServices(servicesRes.value.data || []);
+        if (proposalsRes.status === 'fulfilled')
+          setRecentProposals(proposalsRes.value.data || []);
+        if (clientInvoicesRes.status === 'fulfilled')
+          setRecentClientInvoices(clientInvoicesRes.value.data || []);
+        if (supplierInvoicesRes.status === 'fulfilled')
+          setRecentSupplierInvoices(supplierInvoicesRes.value.data || []);
 
         // If many critical requests failed, show a warning
-        const failures = [invoicesKpiRes, proposalsKpiRes, supplierKpiRes].filter(r => r.status === 'rejected');
+        const failures = [
+          invoicesKpiRes,
+          proposalsKpiRes,
+          supplierKpiRes,
+        ].filter((r) => r.status === 'rejected');
         if (failures.length >= 2) {
-           setError("Certaines données n'ont pas pu être récupérées. Le service est peut-être ralenti.");
+          setError(
+            "Certaines données n'ont pas pu être récupérées. Le service est peut-être ralenti."
+          );
         }
-
       } catch (err: unknown) {
         console.error('Error fetching dashboard data:', err);
         setError(getErrorMessage(err));
@@ -134,6 +178,7 @@ export default function DashboardRootPage() {
     title,
     items,
     type,
+    createLink,
   }: {
     title: string;
     items: any[];
@@ -143,6 +188,7 @@ export default function DashboardRootPage() {
       | 'proposal'
       | 'client-invoice'
       | 'supplier-invoice';
+    createLink?: string;
   }) => {
     const getLink = (item: any) => {
       switch (type) {
@@ -182,9 +228,18 @@ export default function DashboardRootPage() {
       type === 'supplier-invoice';
 
     return (
-      <div className="bg-surface border-border flex flex-col overflow-hidden rounded-xl border h-full shadow-sm">
-        <div className="border-border border-b px-5 py-4">
+      <div className="bg-surface border-border flex h-full flex-col overflow-hidden rounded-xl border shadow-sm">
+        <div className="border-border flex items-center justify-between border-b px-5 py-4">
           <h3 className="text-foreground text-sm font-semibold">{title}</h3>
+          {createLink && (
+            <Link
+              href={createLink}
+              className="btn-primary flex h-6 w-6 items-center justify-center rounded-md p-0 text-sm font-bold"
+              title="Créer nouveau"
+            >
+              +
+            </Link>
+          )}
         </div>
         <div className="flex-1 divide-y divide-gray-100 dark:divide-gray-800">
           {items.length === 0 ? (
@@ -202,10 +257,10 @@ export default function DashboardRootPage() {
                   <div className="min-w-0 flex-1">
                     {isDetailed ? (
                       <div className="flex items-center space-x-6">
-                        <span className="text-foreground text-sm font-medium truncate min-w-[80px] flex-1 transition-colors group-hover:text-primary">
+                        <span className="text-foreground group-hover:text-primary min-w-[80px] flex-1 truncate text-sm font-medium transition-colors">
                           {item.ref}
                         </span>
-                        <div className="flex items-center space-x-8 whitespace-nowrap text-xs">
+                        <div className="flex items-center space-x-8 text-xs whitespace-nowrap">
                           <span className="text-foreground min-w-[75px] text-right font-semibold">
                             {formatCurrency(Number(item.total_ht || 0))}
                           </span>
@@ -218,7 +273,7 @@ export default function DashboardRootPage() {
                             )}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusColor(
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${getStatusColor(
                               item.statut
                             )}`}
                           >
@@ -227,13 +282,13 @@ export default function DashboardRootPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-foreground text-sm font-medium truncate transition-colors group-hover:text-primary">
+                      <p className="text-foreground group-hover:text-primary truncate text-sm font-medium transition-colors">
                         {item.name || item.nom || item.label || 'Sans nom'}
                       </p>
                     )}
                   </div>
                   <div className="ml-4 flex-shrink-0">
-                    <span className="text-muted text-sm transition-colors group-hover:text-primary">
+                    <span className="text-muted group-hover:text-primary text-sm transition-colors">
                       →
                     </span>
                   </div>
@@ -250,17 +305,27 @@ export default function DashboardRootPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-foreground text-3xl font-bold tracking-tight">Tableau de bord</h1>
-          <p className="text-muted mt-2 text-sm">Chargement de vos indicateurs...</p>
+          <h1 className="text-foreground text-3xl font-bold tracking-tight">
+            Tableau de bord
+          </h1>
+          <p className="text-muted mt-2 text-sm">
+            Chargement de vos indicateurs...
+          </p>
         </div>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-surface border-border h-32 animate-pulse rounded-xl border shadow-sm"></div>
+            <div
+              key={i}
+              className="bg-surface border-border h-32 animate-pulse rounded-xl border shadow-sm"
+            ></div>
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 mt-8">
+        <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-surface border-border h-64 animate-pulse rounded-xl border shadow-sm"></div>
+            <div
+              key={i}
+              className="bg-surface border-border h-64 animate-pulse rounded-xl border shadow-sm"
+            ></div>
           ))}
         </div>
       </div>
@@ -270,13 +335,19 @@ export default function DashboardRootPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-foreground text-3xl font-bold tracking-tight">Tableau de bord</h1>
-        <p className="text-muted mt-2 text-sm">Aperçu global de votre activité freelance</p>
+        <h1 className="text-foreground text-3xl font-bold tracking-tight">
+          Tableau de bord
+        </h1>
+        <p className="text-muted mt-2 text-sm">
+          Aperçu global de votre activité freelance
+        </p>
       </div>
 
       {error && (
         <div className="rounded-md bg-red-50 p-4 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30">
-          <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
+          <p className="text-sm font-medium text-red-800 dark:text-red-200">
+            {error}
+          </p>
         </div>
       )}
 
@@ -318,18 +389,48 @@ export default function DashboardRootPage() {
       {/* Recent Activity Section */}
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <RecentList title="Derniers Tiers" items={recentThirdParties} type="thirdparty" />
-          <RecentList title="Derniers Devis" items={recentProposals} type="proposal" />
-        </div>
-        
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <RecentList title="Derniers Produits" items={recentProducts} type="product" />
-          <RecentList title="Derniers Services" items={recentServices} type="product" />
+          <RecentList
+            title="Derniers tiers"
+            items={recentThirdParties}
+            type="thirdparty"
+            createLink="/third-parties/create"
+          />
+          <RecentList
+            title="Derniers devis"
+            items={recentProposals}
+            type="proposal"
+            createLink="/commerce/create"
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <RecentList title="Dernières Factures Clients" items={recentClientInvoices} type="client-invoice" />
-          <RecentList title="Dernières Factures Fournisseurs" items={recentSupplierInvoices} type="supplier-invoice" />
+          <RecentList
+            title="Derniers produits"
+            items={recentProducts}
+            type="product"
+            createLink="/products-services/create"
+          />
+          <RecentList
+            title="Derniers services"
+            items={recentServices}
+            type="product"
+            createLink="/products-services/create"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <RecentList
+            title="Dernières factures clients"
+            items={recentClientInvoices}
+            type="client-invoice"
+            createLink="/billing-payments/create?type=client"
+          />
+          <RecentList
+            title="Dernières factures fournisseurs"
+            items={recentSupplierInvoices}
+            type="supplier-invoice"
+            createLink="/billing-payments/create?type=supplier"
+          />
         </div>
       </div>
     </div>

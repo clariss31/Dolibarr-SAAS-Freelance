@@ -25,7 +25,7 @@ export default function StatCard({
   href,
 }: StatCardProps) {
   const CardContent = (
-    <div className="bg-surface border-border hover:border-border-hover overflow-hidden rounded-xl border p-5 shadow-sm transition-all hover:shadow-md">
+    <div className="bg-surface border-border hover:border-primary/50 overflow-hidden rounded-xl border p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
       <div className="flex items-center justify-between">
         <div className={`rounded-lg bg-background p-2 text-2xl ${colorClassName} ring-1 ring-inset ring-gray-500/10 dark:ring-gray-400/20`}>
           {icon}
