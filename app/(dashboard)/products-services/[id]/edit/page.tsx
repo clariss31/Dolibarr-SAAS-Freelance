@@ -371,7 +371,7 @@ export default function EditProductPage() {
           <button
             type="submit"
             disabled={saving || deleting}
-            className="bg-primary hover:bg-primary-hover focus-visible:outline-primary inline-flex justify-center rounded-md px-6 py-2 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="btn-primary inline-flex justify-center px-6 py-2"
           >
             {saving ? 'Enregistrement en cours...' : 'Enregistrer'}
           </button>

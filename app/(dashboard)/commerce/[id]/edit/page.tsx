@@ -391,7 +391,7 @@ export default function EditCommercePage() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-primary hover:bg-primary-hover focus-visible:outline-primary inline-flex justify-center rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="btn-primary inline-flex justify-center px-4 py-2"
           >
             {saving ? 'Sauvegarde en cours...' : 'Enregistrer'}
           </button>

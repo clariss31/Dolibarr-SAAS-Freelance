@@ -162,7 +162,7 @@ export default function BillingPaymentsPage() {
           {/* Un bouton pour l'instant désactivé ou pour de futures fonctionnalités */}
           <button
             disabled
-            className="bg-primary/70 block cursor-not-allowed rounded-md px-3 py-2 text-center text-sm font-semibold text-white opacity-50 shadow-sm"
+            className="btn-primary block px-3 py-2 text-center"
           >
             + Nouvelle facture
           </button>

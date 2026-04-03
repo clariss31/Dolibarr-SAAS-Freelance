@@ -93,7 +93,7 @@ export default function ProductsServicesPage() {
           <button
             type="button"
             onClick={() => router.push('/products-services/create')}
-            className="bg-primary hover:bg-primary-hover focus-visible:outline-primary block rounded-md px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="btn-primary block px-3 py-2 text-center"
           >
             + Nouveau produit / service
           </button>
