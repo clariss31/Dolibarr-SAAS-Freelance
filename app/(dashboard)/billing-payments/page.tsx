@@ -14,7 +14,9 @@ export default function BillingPaymentsPage() {
 
   // Data state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [thirdPartiesMap, setThirdPartiesMap] = useState<Record<string, string>>({});
+  const [thirdPartiesMap, setThirdPartiesMap] = useState<
+    Record<string, string>
+  >({});
   const [loading, setLoading] = useState(true);
   const [loadingThirdParties, setLoadingThirdParties] = useState(true);
   const [error, setError] = useState('');
@@ -24,9 +26,10 @@ export default function BillingPaymentsPage() {
   const limit = 10;
   const [hasMore, setHasMore] = useState(true);
 
-  // Search filter
+  // Filtres
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Charger le mapping des tiers une seule fois au montage
   useEffect(() => {
@@ -60,10 +63,23 @@ export default function BillingPaymentsPage() {
       const endpoint =
         activeTab === 'client' ? '/invoices' : '/supplierinvoices';
       let query = `${endpoint}?sortfield=t.rowid&sortorder=DESC&limit=${limit}&page=${currentPage}`;
+      const conditions: string[] = [];
 
-      // Seulement la recherche par référence (ref) pour l'instant
+      if (statusFilter !== 'all') {
+        const field = activeTab === 'supplier' ? 't.fk_statut' : 't.fk_statut';
+        conditions.push(`(${field}:=:${statusFilter})`);
+      }
+
       if (debouncedSearch) {
-        query += `&sqlfilters=(t.ref:like:'%25${debouncedSearch}%25')`;
+        const cleanTerm = debouncedSearch.replace(/'/g, "''");
+        // Recherche sur REF et nom du tiers (s.nom pour Dolibarr)
+        conditions.push(
+          `((t.ref:like:'%${cleanTerm}%') OR (s.nom:like:'%${cleanTerm}%'))`
+        );
+      }
+
+      if (conditions.length > 0) {
+        query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
       }
 
       const response = await api.get(query);
@@ -92,12 +108,12 @@ export default function BillingPaymentsPage() {
   // Fetch when page, tab or search changes
   useEffect(() => {
     fetchInvoices(page);
-  }, [page, activeTab, debouncedSearch]);
+  }, [page, activeTab, debouncedSearch, statusFilter]);
 
   // Reset page to 0 when tab or search changes
   useEffect(() => {
     setPage(0);
-  }, [activeTab, debouncedSearch]);
+  }, [activeTab, debouncedSearch, statusFilter]);
 
   // Utility to format numbers into currency
   const formatCurrency = (amount: string | number | undefined) => {
@@ -177,7 +193,6 @@ export default function BillingPaymentsPage() {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-          {/* Un bouton pour l'instant désactivé ou pour de futures fonctionnalités */}
           <button
             type="button"
             onClick={() => router.push('/billing-payments/create')}
@@ -226,7 +241,7 @@ export default function BillingPaymentsPage() {
       </div>
 
       {/* Filters Bar */}
-      <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
         <div className="flex-1">
           <label htmlFor="search" className="sr-only">
             Rechercher
@@ -234,11 +249,28 @@ export default function BillingPaymentsPage() {
           <input
             id="search"
             type="search"
-            placeholder="Rechercher..."
+            placeholder="Rechercher par réf. ou client..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
           />
+        </div>
+        <div className="sm:flex-none">
+          <label htmlFor="status" className="sr-only">
+            État
+          </label>
+          <select
+            id="status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:w-48"
+          >
+            <option value="all">Tous les états</option>
+            <option value="0">Brouillon</option>
+            <option value="1">Impayée</option>
+            <option value="2">Payée</option>
+            <option value="3">Abandonnée</option>
+          </select>
         </div>
       </div>
 
@@ -293,7 +325,7 @@ export default function BillingPaymentsPage() {
               </tr>
             </thead>
             <tbody className="divide-border bg-surface divide-y">
-              {(loading || loadingThirdParties) ? (
+              {loading || loadingThirdParties ? (
                 <tr>
                   <td
                     colSpan={7}
@@ -329,7 +361,9 @@ export default function BillingPaymentsPage() {
                       {formatDate(invoice.date)}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
-                      {formatDate(invoice.datelimit || (invoice as any).date_lim_reglement)}
+                      {formatDate(
+                        invoice.datelimit || (invoice as any).date_lim_reglement
+                      )}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
                       {invoice.thirdparty?.name ||

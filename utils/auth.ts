@@ -24,11 +24,6 @@ export const auth = {
   clearAuth: () => {
     Cookies.remove(TOKEN_KEY);
     Cookies.remove(API_URL_KEY);
-    // On nettoie aussi le localStorage par précaution
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(API_URL_KEY);
-    }
   },
 
   isAuthenticated: () => !!Cookies.get(TOKEN_KEY),
