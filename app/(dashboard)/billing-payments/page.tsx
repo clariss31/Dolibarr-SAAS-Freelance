@@ -13,7 +13,9 @@ export default function BillingPaymentsPage() {
 
   // Data state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [thirdPartiesMap, setThirdPartiesMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [loadingThirdParties, setLoadingThirdParties] = useState(true);
   const [error, setError] = useState('');
 
   // Pagination state
@@ -24,6 +26,23 @@ export default function BillingPaymentsPage() {
   // Search filter
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Charger le mapping des tiers une seule fois au montage
+  useEffect(() => {
+    api
+      .get('/thirdparties?limit=1000')
+      .then((res) => {
+        if (res.data) {
+          const dict: Record<string, string> = {};
+          res.data.forEach((t: any) => {
+            dict[String(t.id)] = t.name || t.nom || t.soc_name;
+          });
+          setThirdPartiesMap(dict);
+        }
+      })
+      .catch((err) => console.error('Could not preload third parties', err))
+      .finally(() => setLoadingThirdParties(false));
+  }, []);
 
   // Debounce search input
   useEffect(() => {
@@ -161,7 +180,8 @@ export default function BillingPaymentsPage() {
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           {/* Un bouton pour l'instant désactivé ou pour de futures fonctionnalités */}
           <button
-            disabled
+            type="button"
+            onClick={() => router.push('/billing-payments/create')}
             className="btn-primary block px-3 py-2 text-center"
           >
             + Nouvelle facture
@@ -215,7 +235,7 @@ export default function BillingPaymentsPage() {
           <input
             id="search"
             type="search"
-            placeholder="Rechercher par référence..."
+            placeholder="Rechercher..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
@@ -274,7 +294,7 @@ export default function BillingPaymentsPage() {
               </tr>
             </thead>
             <tbody className="divide-border bg-surface divide-y">
-              {loading && invoices.length === 0 ? (
+              {(loading || loadingThirdParties) && invoices.length === 0 ? (
                 <tr>
                   <td
                     colSpan={7}
@@ -296,8 +316,12 @@ export default function BillingPaymentsPage() {
                 invoices.map((invoice) => (
                   <tr
                     key={invoice.id}
-                    onClick={() => router.push(`/billing-payments/${invoice.id}?type=${activeTab}`)}
-                    className="hover:bg-background/80 transition-colors cursor-pointer"
+                    onClick={() =>
+                      router.push(
+                        `/billing-payments/${invoice.id}?type=${activeTab}`
+                      )
+                    }
+                    className="hover:bg-background/80 cursor-pointer transition-colors"
                   >
                     <td className="text-foreground py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap sm:pl-6">
                       {invoice.ref}
@@ -306,12 +330,13 @@ export default function BillingPaymentsPage() {
                       {formatDate(invoice.date)}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
-                      {formatDate(invoice.datelimit)}
+                      {formatDate(invoice.datelimit || (invoice as any).date_lim_reglement)}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
-                      {invoice.soc_name ||
+                      {invoice.thirdparty?.name ||
+                        invoice.soc_name ||
                         invoice.nom ||
-                        invoice.thirdparty?.name ||
+                        thirdPartiesMap[String(invoice.socid)] ||
                         '-'}
                     </td>
                     <td className="text-foreground px-3 py-4 text-right text-sm font-medium whitespace-nowrap">

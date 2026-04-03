@@ -29,6 +29,12 @@
   button:disabled {
     cursor: not-allowed;
   }
+
+  select {
+    min-height: 2.375rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
 }
 
 @layer components {
