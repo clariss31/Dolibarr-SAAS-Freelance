@@ -67,13 +67,13 @@ export default function CreateProductPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8">
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
             Nouveau produit / service
           </h1>
-          <p className="text-muted mt-1 text-sm">
+          <p className="text-muted mt-2 text-sm">
             Créez un nouvel élément pour votre catalogue.
           </p>
         </div>
@@ -100,6 +100,63 @@ export default function CreateProductPage() {
       >
         <div className="space-y-6 p-6">
           <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
+            {/* Type & Libellé - Groupés sur la même ligne */}
+            <div className="sm:col-span-6">
+              <span className="text-foreground block text-sm leading-6 font-medium">
+                Type & libellé <span className="text-red-500">*</span>
+              </span>
+              <div className="mt-2 flex gap-3">
+                {/* Sélecteur Produit / Service */}
+                <fieldset aria-label="Type d'élément">
+                  <div className="border-border flex h-full overflow-hidden rounded-md border shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, type: '0' }))
+                      }
+                      className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        formData.type === '0'
+                          ? 'bg-primary text-background'
+                          : 'text-muted hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      Produit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, type: '1' }))
+                      }
+                      className={`border-border border-l px-4 py-2 text-sm font-medium transition-colors ${
+                        formData.type === '1'
+                          ? 'bg-primary text-background'
+                          : 'text-muted hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      Service
+                    </button>
+                  </div>
+                </fieldset>
+
+                {/* Input Libellé */}
+                <div className="flex-1">
+                  <label htmlFor="label" className="sr-only">
+                    Libellé
+                  </label>
+                  <input
+                    type="text"
+                    name="label"
+                    id="label"
+                    required
+                    placeholder="Libellé de l'élément"
+                    value={formData.label}
+                    onChange={handleChange}
+                    className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 px-3 py-2 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="sm:col-span-3">
               <label
                 htmlFor="ref"
@@ -113,49 +170,8 @@ export default function CreateProductPage() {
                   name="ref"
                   id="ref"
                   required
+                  placeholder="REF123"
                   value={formData.ref}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 px-3 py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-                />
-              </div>
-            </div>
-
-            <div className="sm:col-span-3">
-              <label
-                htmlFor="type"
-                className="text-foreground block text-sm leading-6 font-medium"
-              >
-                Type de l'élément <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-2">
-                <select
-                  id="type"
-                  name="type"
-                  required
-                  value={formData.type}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-                >
-                  <option value="0">Produit</option>
-                  <option value="1">Service</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="sm:col-span-6">
-              <label
-                htmlFor="label"
-                className="text-foreground block text-sm leading-6 font-medium"
-              >
-                Libellé <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  name="label"
-                  id="label"
-                  required
-                  value={formData.label}
                   onChange={handleChange}
                   className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 px-3 py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
                 />
@@ -177,7 +193,7 @@ export default function CreateProductPage() {
                   id="price"
                   value={formData.price}
                   onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 pl-3 py-1.5 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                  className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 py-1.5 pr-10 pl-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
                 />
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                   <span className="text-muted sm:text-sm">€</span>
@@ -200,7 +216,7 @@ export default function CreateProductPage() {
                   id="tva_tx"
                   value={formData.tva_tx}
                   onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 pl-3 py-1.5 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                  className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 py-1.5 pr-10 pl-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
                 />
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                   <span className="text-muted sm:text-sm">%</span>
@@ -275,7 +291,7 @@ export default function CreateProductPage() {
         </div>
 
         {/* Actions Submit */}
-        <div className="border-border flex items-center justify-end space-x-4 border-t pt-4 px-6 pb-6">
+        <div className="border-border flex items-center justify-end space-x-4 border-t px-6 pt-4 pb-6">
           <button
             type="button"
             onClick={() => router.back()}

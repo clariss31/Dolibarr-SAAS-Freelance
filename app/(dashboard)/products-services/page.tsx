@@ -20,7 +20,7 @@ export default function ProductsServicesPage() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all'); // all, product, service
+  const [typeFilter, setTypeFilter] = useState('product'); // product, service
 
   // Debounce de la recherche textuelle
   useEffect(() => {
@@ -110,35 +110,46 @@ export default function ProductsServicesPage() {
         </div>
       )}
 
+      {/* Onglets Switcher */}
+      <div className="border-border border-b">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            onClick={() => setTypeFilter('product')}
+            className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap transition-colors ${
+              typeFilter === 'product'
+                ? 'border-primary text-primary'
+                : 'text-muted hover:border-border hover:text-foreground border-transparent'
+            }`}
+          >
+            📦 Produits
+          </button>
+          <button
+            onClick={() => setTypeFilter('service')}
+            className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap transition-colors ${
+              typeFilter === 'service'
+                ? 'border-primary text-primary'
+                : 'text-muted hover:border-border hover:text-foreground border-transparent'
+            }`}
+          >
+            ⚙️ Services
+          </button>
+        </nav>
+      </div>
+
       {/* Recherche et filtres */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
-        <div className="flex-1">
+        <div className="max-w-md flex-1">
           <label htmlFor="search" className="sr-only">
             Rechercher
           </label>
           <input
             id="search"
             type="search"
-            placeholder="Rechercher par référence ou libellé..."
+            placeholder={`Rechercher un ${typeFilter === 'product' ? 'produit' : 'service'}...`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+            className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
           />
-        </div>
-        <div>
-          <label htmlFor="type-filter" className="sr-only">
-            Filtrer par type
-          </label>
-          <select
-            id="type-filter"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
-          >
-            <option value="all">Tous les types</option>
-            <option value="product">Produits</option>
-            <option value="service">Services</option>
-          </select>
         </div>
       </div>
 
@@ -166,18 +177,22 @@ export default function ProductsServicesPage() {
                 >
                   Prix HT
                 </th>
-                <th
-                  scope="col"
-                  className="text-foreground w-[10%] px-3 py-3.5 text-center text-sm font-semibold"
-                >
-                  Stock physique
-                </th>
-                <th
-                  scope="col"
-                  className="text-foreground w-[10%] px-3 py-3.5 text-center text-sm font-semibold"
-                >
-                  Stock virtuel
-                </th>
+                {typeFilter !== 'service' && (
+                  <>
+                    <th
+                      scope="col"
+                      className="text-foreground w-[10%] px-3 py-3.5 text-center text-sm font-semibold"
+                    >
+                      Stock physique
+                    </th>
+                    <th
+                      scope="col"
+                      className="text-foreground w-[10%] px-3 py-3.5 text-center text-sm font-semibold"
+                    >
+                      Stock virtuel
+                    </th>
+                  </>
+                )}
                 <th
                   scope="col"
                   className="text-foreground w-[15%] px-3 py-3.5 text-center text-sm font-semibold"
@@ -196,7 +211,7 @@ export default function ProductsServicesPage() {
               {loading && products.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={typeFilter === 'service' ? 5 : 7}
                     className="text-muted py-10 text-center text-sm"
                   >
                     Recherche en cours...
@@ -205,7 +220,7 @@ export default function ProductsServicesPage() {
               ) : products.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={typeFilter === 'service' ? 5 : 7}
                     className="text-muted py-10 text-center text-sm"
                   >
                     Aucun produit trouvé ne correspond à vos critères.
@@ -221,18 +236,7 @@ export default function ProductsServicesPage() {
                     className="hover:bg-background/80 cursor-pointer transition-colors"
                   >
                     <td className="text-foreground py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap sm:pl-6">
-                      <div className="flex items-center space-x-2">
-                        {String(product.type) === '1' ? (
-                          <span title="Service" className="text-blue-500">
-                            ⚙️
-                          </span>
-                        ) : (
-                          <span title="Produit" className="text-yellow-600">
-                            📦
-                          </span>
-                        )}
-                        <span>{product.ref}</span>
-                      </div>
+                      <span>{product.ref}</span>
                     </td>
                     <td className="text-muted max-w-xs truncate px-3 py-4 text-sm">
                       {product.label}
@@ -242,16 +246,16 @@ export default function ProductsServicesPage() {
                         ? `${parseFloat(String(product.price)).toFixed(2)} €`
                         : '0.00 €'}
                     </td>
-                    <td className="text-muted px-3 py-4 text-center text-sm whitespace-nowrap">
-                      {String(product.type) === '1'
-                        ? '-'
-                        : product.reel_stock || '0'}
-                    </td>
-                    <td className="text-muted px-3 py-4 text-center text-sm whitespace-nowrap">
-                      {String(product.type) === '1'
-                        ? '-'
-                        : product.virtual_stock || '0'}
-                    </td>
+                    {typeFilter !== 'service' && (
+                      <>
+                        <td className="text-muted px-3 py-4 text-center text-sm whitespace-nowrap">
+                          {product.reel_stock || '0'}
+                        </td>
+                        <td className="text-muted px-3 py-4 text-center text-sm whitespace-nowrap">
+                          {product.virtual_stock || '0'}
+                        </td>
+                      </>
+                    )}
                     <td className="px-3 py-4 text-center text-sm whitespace-nowrap">
                       {String(product.tosell) === '1' ? (
                         <span className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300">

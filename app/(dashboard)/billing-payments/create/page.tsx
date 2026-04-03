@@ -128,9 +128,7 @@ export default function CreateInvoicePage() {
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
             Nouvelle facture{' '}
-            <span className="text-primary">
-              {invoiceType === 'client' ? 'client' : 'fournisseur'}
-            </span>
+            {invoiceType === 'client' ? 'client' : 'fournisseur'}
           </h1>
           <p className="text-muted mt-1 text-sm">
             Créez une nouvelle facture en brouillon.
