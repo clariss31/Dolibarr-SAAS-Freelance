@@ -27,8 +27,7 @@ export default function EditThirdPartyPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState('');
+    const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchTier = async () => {
@@ -110,7 +109,7 @@ export default function EditThirdPartyPage() {
     ) {
       return;
     }
-    setDeleting(true);
+    
     setError('');
     try {
       await api.delete(`/thirdparties/${id}`);
@@ -121,7 +120,7 @@ export default function EditThirdPartyPage() {
         apiErr.response?.data?.error?.message ||
           'Impossible de supprimer ce tiers. Il est probablement lié à des factures ou propositions commerciales existantes.'
       );
-      setDeleting(false);
+      
     }
   };
 
@@ -147,14 +146,7 @@ export default function EditThirdPartyPage() {
           </p>
         </div>
         <div className="flex items-center space-x-6">
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={saving || deleting}
-            className="text-sm font-semibold text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
-          >
-            {deleting ? 'Suppression...' : 'Supprimer ce tiers'}
-          </button>
+          
           <button
             onClick={() => router.back()}
             className="text-muted hover:text-foreground text-sm font-medium transition-colors"
@@ -446,14 +438,14 @@ export default function EditThirdPartyPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            disabled={saving || deleting}
+            disabled={saving}
             className="text-muted hover:text-foreground text-sm leading-6 font-medium disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
-            disabled={saving || deleting}
+            disabled={saving}
             className="btn-primary inline-flex justify-center px-6 py-2"
           >
             {saving ? 'Enregistrement en cours...' : 'Enregistrer'}

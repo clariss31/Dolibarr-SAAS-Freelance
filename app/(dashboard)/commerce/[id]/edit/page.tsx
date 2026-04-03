@@ -66,8 +66,7 @@ export default function EditCommercePage() {
   const [clientName, setClientName] = useState('Chargement...');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState('');
+    const [error, setError] = useState('');
 
   // Helper to convert timestamp (seconds) to YYYY-MM-DD for <input type="date">
   const timestampToDateString = (ts: string | number | undefined) => {
@@ -220,7 +219,7 @@ export default function EditCommercePage() {
     ) {
       return;
     }
-    setDeleting(true);
+    
     setError('');
     try {
       await api.delete(`/proposals/${id}`);
@@ -231,7 +230,7 @@ export default function EditCommercePage() {
         apiErr.response?.data?.error?.message ||
           'Impossible de supprimer ce devis.'
       );
-      setDeleting(false);
+      
     }
   };
 
@@ -261,14 +260,7 @@ export default function EditCommercePage() {
           </p>
         </div>
         <div className="flex items-center space-x-6">
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={saving || deleting}
-            className="text-sm font-semibold text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
-          >
-            {deleting ? 'Suppression...' : 'Supprimer ce devis'}
-          </button>
+          
           <button
             onClick={() => router.back()}
             className="text-muted hover:text-foreground text-sm font-medium transition-colors"

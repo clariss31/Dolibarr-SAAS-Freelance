@@ -296,7 +296,8 @@ export default function BillingPaymentsPage() {
                 invoices.map((invoice) => (
                   <tr
                     key={invoice.id}
-                    className="hover:bg-background/80 transition-colors"
+                    onClick={() => router.push(`/billing-payments/${invoice.id}?type=${activeTab}`)}
+                    className="hover:bg-background/80 transition-colors cursor-pointer"
                   >
                     <td className="text-foreground py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap sm:pl-6">
                       {invoice.ref}

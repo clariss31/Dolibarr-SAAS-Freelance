@@ -49,12 +49,14 @@ export interface Product {
 // Définition du type ligne de proposition
 export interface ProposalLine {
   id?: string;
+  rowid?: string;
   fk_product?: string | number;
   label?: string;
   product_label?: string;
   description?: string;
   qty: number | string;
   subprice: number | string;
+  up?: number | string;
   tva_tx: number | string;
   total_ht: number | string;
   total_ttc: number | string;
@@ -91,4 +93,5 @@ export interface Invoice {
   total_ttc: number | string;
   paye: string | number;
   statut: string | number;
+  lines?: ProposalLine[];
 }

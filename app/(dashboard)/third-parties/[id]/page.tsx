@@ -14,6 +14,22 @@ export default function ThirdPartyDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer définitivement ce tiers ?')) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await api.delete(`/thirdparties/${id}`);
+      router.push('/third-parties');
+    } catch (err: unknown) {
+      const apiErr = err as Error & ApiError;
+      setError(apiErr.response?.data?.error?.message || 'Impossible de supprimer ce tiers. Il est probablement lié à des factures ou propositions commerciales existantes.');
+      setDeleting(false);
+    }
+  };
+
   useEffect(() => {
     const fetchTier = async () => {
       try {
@@ -90,12 +106,19 @@ export default function ThirdPartyDetailsPage() {
             {getTierType(tier)}
           </span>
         </div>
-        <div className="mt-4 sm:mt-0 sm:flex sm:space-x-3">
+        <div className="mt-4 sm:mt-0 sm:flex sm:items-center sm:space-x-4">
           <button
             onClick={() => router.push(`/third-parties/${id}/edit`)}
             className="inline-flex justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 transition-colors ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 dark:hover:bg-gray-700"
           >
             Modifier
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-sm font-semibold text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
+          >
+            {deleting ? 'Suppression...' : 'Supprimer'}
           </button>
         </div>
       </div>

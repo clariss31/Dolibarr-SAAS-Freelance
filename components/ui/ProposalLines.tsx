@@ -182,7 +182,7 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
             type="button"
             onClick={handleAddLine}
             disabled={!selectedProductId}
-            className="bg-primary hover:bg-primary-hover focus-visible:outline-primary inline-flex h-[38px] items-center justify-center rounded-md px-4 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="btn-primary inline-flex h-[38px] items-center justify-center px-4"
           >
             Ajouter la ligne
           </button>
