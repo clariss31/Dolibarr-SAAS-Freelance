@@ -139,7 +139,7 @@ export default function ThirdPartiesPage() {
           <input
             id="search"
             type="search"
-            placeholder="Rechercher par nom..."
+            placeholder="Recherche..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"

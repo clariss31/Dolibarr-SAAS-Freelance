@@ -1,3 +1,4 @@
+// Définition du type tiers
 export interface ThirdParty {
   id: string;
   name: string;
@@ -16,6 +17,7 @@ export interface ThirdParty {
   code_fournisseur?: string;
 }
 
+// Définition du type erreur API
 export interface ApiError {
   response?: {
     status?: number;
@@ -28,6 +30,7 @@ export interface ApiError {
   };
 }
 
+// Définition du type produit
 export interface Product {
   id: string;
   ref: string;
@@ -43,21 +46,21 @@ export interface Product {
   type: string | number;   // 0 = produit, 1 = service
 }
 
+// Définition du type ligne de proposition
 export interface ProposalLine {
   id?: string;
-  rowid?: string;              // Dolibarr retourne parfois cet alias
   fk_product?: string | number;
-  label?: string;              // Peut être vide si ligne produit
-  product_label?: string;      // Nom du produit (champ réel de l'API Dolibarr)
-  description?: string;        // Description libre
-  qty: number | string;        // Dolibarr retourne des strings
-  subprice: number | string;   // Prix unitaire HT
-  up?: number | string;        // Alias de subprice dans certaines versions
-  tva_tx: number | string;     // Taux de TVA (%)
+  label?: string;
+  product_label?: string;
+  description?: string;
+  qty: number | string;
+  subprice: number | string;
+  tva_tx: number | string;
   total_ht: number | string;
   total_ttc: number | string;
 }
 
+// Définition du type proposition
 export interface Proposal {
   id: string;
   ref: string;
@@ -65,10 +68,27 @@ export interface Proposal {
   thirdparty?: { name?: string };
   soc_name?: string;
   name?: string;
-  datep?: number | string; // Date de proposition (Timestamp)
-  fin_validite?: number | string; // Date de fin (Timestamp)
+  datep?: number | string;
+  fin_validite?: number | string;
   total_ht: number | string;
   total_ttc?: number | string;
-  statut: string | number; // 0=Brouillon, 1=Ouvert, 2=Signée, 3=Non Signée, 4=Facturée
+  statut: string | number;
   lines?: ProposalLine[];
+}
+
+// Définition du type facture
+export interface Invoice {
+  id: string;
+  ref: string;
+  socid: string | number;
+  thirdparty?: { name?: string };
+  soc_name?: string;
+  nom?: string;
+  date?: number | string;
+  datelimit?: number | string;
+  total_ht: number | string;
+  total_tva?: number | string;
+  total_ttc: number | string;
+  paye: string | number;
+  statut: string | number;
 }

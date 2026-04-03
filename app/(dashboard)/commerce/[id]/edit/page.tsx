@@ -22,10 +22,10 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
     line.label ||
     line.description ||
     `Ligne ${index + 1}`;
-  // Résolution de l'ID de ligne (rowid ou id selon la version de l'API)
+  // Résolution de l'ID de ligne
   const lineId = line.id ?? line.id;
   // Prix unitaire : subprice ou son alias `up`
-  const unitPrice = Number(line.subprice ?? line.up ?? 0);
+  const unitPrice = Number(line.subprice ?? 0);
   const qty = Number(line.qty) || 1;
   const tva = Number(line.tva_tx) || 0;
   // Recalcul local si les totaux fournis par l'API sont à 0
@@ -121,7 +121,7 @@ export default function EditCommercePage() {
             }
           }
 
-          // Résolution du nom du Tiers
+          // Résolution du nom du tiers
           if (d.thirdparty?.name) {
             setClientName(d.thirdparty.name);
           } else if (d.soc_name || d.name) {
