@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, notFound } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { getErrorMessage } from '../../../../utils/error-handler';
 import { Proposal, ProposalLine, ThirdParty, ApiError } from '../../../../types/dolibarr';
 
 export default function CommerceDetailsPage() {
@@ -25,8 +26,7 @@ export default function CommerceDetailsPage() {
       await api.delete(`/proposals/${id}`);
       router.push('/commerce');
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(apiErr.response?.data?.error?.message || 'Impossible de supprimer ce devis.');
+      setError(getErrorMessage(err));
       setDeleting(false);
     }
   };
@@ -66,7 +66,12 @@ export default function CommerceDetailsPage() {
           setError('Proposition commerciale introuvable.');
         }
       } catch (err: unknown) {
-        setError('Erreur lors de la récupération des informations du devis.');
+        const apiErr = err as ApiError;
+        if (apiErr.response?.status === 404) {
+          notFound();
+        } else {
+          setError(getErrorMessage(err));
+        }
       } finally {
         setLoading(false);
       }

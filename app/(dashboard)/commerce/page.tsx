@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
+import { getErrorMessage } from '../../../utils/error-handler';
 import { Proposal, ApiError, ThirdParty } from '../../../types/dolibarr';
 
 export default function CommercePage() {
@@ -84,10 +85,7 @@ export default function CommercePage() {
       if (apiErr.response?.status === 404) {
         setProposals([]);
       } else {
-        setError(
-          apiErr.response?.data?.error?.message ||
-            'Erreur lors du chargement des propositions commerciales.'
-        );
+        setError(getErrorMessage(err));
       }
     } finally {
       setLoading(false);

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
+import { getErrorMessage } from '../../../../../utils/error-handler';
 import { ApiError } from '../../../../../types/dolibarr';
 
 export default function EditThirdPartyPage() {
@@ -56,7 +57,7 @@ export default function EditThirdPartyPage() {
           });
         }
       } catch (err) {
-        setError('Erreur lors de la récupération des données du tiers.');
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -92,11 +93,7 @@ export default function EditThirdPartyPage() {
       await api.put(`/thirdparties/${id}`, payload); // Mise à jour du tiers
       router.push(`/third-parties/${id}`); // Redirection vers la fiche du tiers
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          'Erreur inattendue lors de la mise à jour.'
-      );
+      setError(getErrorMessage(err));
       setSaving(false);
     }
   };
@@ -115,12 +112,7 @@ export default function EditThirdPartyPage() {
       await api.delete(`/thirdparties/${id}`);
       router.push('/third-parties');
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          'Impossible de supprimer ce tiers. Il est probablement lié à des factures ou propositions commerciales existantes.'
-      );
-      
+      setError(getErrorMessage(err));
     }
   };
 

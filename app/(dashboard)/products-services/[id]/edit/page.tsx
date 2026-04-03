@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
+import { getErrorMessage } from '../../../../../utils/error-handler';
 import { Product, ApiError } from '../../../../../types/dolibarr';
 
 export default function EditProductPage() {
@@ -55,7 +56,7 @@ export default function EditProductPage() {
           setError('Produit introuvable.');
         }
       } catch (err: unknown) {
-        setError('Erreur lors du chargement des informations du produit.');
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -100,11 +101,7 @@ export default function EditProductPage() {
       await api.put(`/products/${id}`, payload);
       router.push(`/products-services/${id}`); // Redirection vers le détail
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          "Une erreur s'est produite lors de l'enregistrement."
-      );
+      setError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -124,12 +121,7 @@ export default function EditProductPage() {
       await api.delete(`/products/${id}`);
       router.push('/products-services');
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          'Impossible de supprimer cet élément. Il est probablement lié à des factures ou propositions commerciales existantes.'
-      );
-      
+      setError(getErrorMessage(err));
     }
   };
 

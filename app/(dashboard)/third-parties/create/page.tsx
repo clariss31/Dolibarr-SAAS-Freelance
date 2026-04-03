@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { getErrorMessage } from '../../../../utils/error-handler';
 import { ApiError } from '../../../../types/dolibarr';
 
 export default function CreateThirdPartyPage() {
@@ -66,11 +67,7 @@ export default function CreateThirdPartyPage() {
       const newId = response.data; //Récupération de l'ID du tiers créé
       router.push(`/third-parties/${newId}`); //Redirection vers la page de détails du tiers
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          'Erreur inattendue lors de la création.'
-      );
+      setError(getErrorMessage(err));
       setSaving(false);
     }
   };

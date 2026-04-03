@@ -3,6 +3,7 @@
 import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
+import { getErrorMessage } from '../../../../../utils/error-handler';
 import { Invoice, ProposalLine, ApiError } from '../../../../../types/dolibarr';
 import ProposalLines, { LocalLine } from '../../../../../components/ui/ProposalLines';
 
@@ -120,8 +121,8 @@ function EditInvoiceContent({ id }: { id: string }) {
             setClientName('Inconnu');
           }
         }
-      } catch {
-        setError('Erreur lors de la récupération des données de la facture.');
+      } catch (err: unknown) {
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -172,8 +173,7 @@ function EditInvoiceContent({ id }: { id: string }) {
 
       router.push(`/billing-payments/${id}?type=${typeParam}`);
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(apiErr.response?.data?.error?.message || 'Erreur inattendue lors de la mise à jour.');
+      setError(getErrorMessage(err));
       setSaving(false);
     }
   };

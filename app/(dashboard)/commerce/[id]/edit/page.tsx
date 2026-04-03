@@ -8,6 +8,7 @@ import {
   ProposalLine,
   ApiError,
 } from '../../../../../types/dolibarr';
+import { getErrorMessage } from '../../../../../utils/error-handler';
 import ProposalLines, {
   LocalLine,
 } from '../../../../../components/ui/ProposalLines';
@@ -140,8 +141,8 @@ export default function EditCommercePage() {
             setClientName('Inconnu');
           }
         }
-      } catch {
-        setError('Erreur lors de la récupération des données du devis.');
+      } catch (err) {
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -202,11 +203,7 @@ export default function EditCommercePage() {
 
       router.push(`/commerce/${id}`);
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          'Erreur inattendue lors de la mise à jour.'
-      );
+      setError(getErrorMessage(err));
       setSaving(false);
     }
   };
@@ -225,12 +222,7 @@ export default function EditCommercePage() {
       await api.delete(`/proposals/${id}`);
       router.push('/commerce');
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          'Impossible de supprimer ce devis.'
-      );
-      
+      setError(getErrorMessage(err));
     }
   };
 

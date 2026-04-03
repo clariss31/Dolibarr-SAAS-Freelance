@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, notFound } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { getErrorMessage } from '../../../../utils/error-handler';
 import { Invoice, ApiError } from '../../../../types/dolibarr';
 
 export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,7 +31,12 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
           setError('Facture introuvable.');
         }
       } catch (err: unknown) {
-        setError('Erreur lors de la récupération de la facture.');
+        const apiErr = err as ApiError;
+        if (apiErr.response?.status === 404) {
+          notFound();
+        } else {
+          setError(getErrorMessage(err));
+        }
       } finally {
         setLoading(false);
       }
@@ -108,8 +114,8 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
       const endpoint = typeParam === 'supplier' ? '/supplierinvoices' : '/invoices';
       await api.delete(`${endpoint}/${id}`);
       router.push('/billing-payments');
-    } catch {
-      setError('Erreur lors de la suppression de la facture.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
       setIsDeleting(false);
     }
   };

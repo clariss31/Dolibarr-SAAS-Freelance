@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { getErrorMessage } from '../../../../utils/error-handler';
 import { ApiError } from '../../../../types/dolibarr';
 import ProposalLines, { LocalLine } from '../../../../components/ui/ProposalLines';
 
@@ -92,11 +93,7 @@ export default function CreateCommercePage() {
       const newProposalId = response.data as string | number;
       router.push(`/commerce/${newProposalId}`);
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          'Erreur inattendue lors de la création du devis.'
-      );
+      setError(getErrorMessage(err));
       setSaving(false);
     }
   };

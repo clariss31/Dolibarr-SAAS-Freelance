@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
+import { getErrorMessage } from '../../../utils/error-handler';
 import { ThirdParty, ApiError } from '../../../types/dolibarr';
 
 export default function ThirdPartiesPage() {
@@ -65,9 +66,7 @@ export default function ThirdPartiesPage() {
         setTiers([]);
         setHasMore(false);
       } else {
-        setError(
-          "Impossible de charger les tiers. Vérifiez votre connexion à l'API."
-        );
+        setError(getErrorMessage(err));
       }
     } finally {
       setLoading(false);

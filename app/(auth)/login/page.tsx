@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
 import { auth } from '../../../utils/auth';
+import { getErrorMessage } from '../../../utils/error-handler';
 import { ApiError } from '../../../types/dolibarr';
 
 export default function LoginPage() {
@@ -39,15 +40,7 @@ export default function LoginPage() {
         setError('Identifiants incorrects.');
       }
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      if (apiErr.response?.status === 404) {
-        setError("L'URL de l'API semble incorrecte (404).");
-      } else {
-        setError(
-          apiErr.response?.data?.error?.message ||
-          "Erreur de connexion. Vérifiez vos identifiants ou l'URL de l'API."
-        );
-      }
+      setError(getErrorMessage(err, 'login'));
     } finally {
       setLoading(false);
     }

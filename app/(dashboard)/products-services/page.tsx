@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
+import { getErrorMessage } from '../../../utils/error-handler';
 import { Product, ApiError } from '../../../types/dolibarr';
 
 export default function ProductsServicesPage() {
@@ -61,9 +62,7 @@ export default function ProductsServicesPage() {
         setProducts([]);
         setHasMore(false);
       } else {
-        setError(
-          "Impossible de charger le catalogue. Vérifiez votre connexion à l'API."
-        );
+        setError(getErrorMessage(err));
       }
     } finally {
       setLoading(false);

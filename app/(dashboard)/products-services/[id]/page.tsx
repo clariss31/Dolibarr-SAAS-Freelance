@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, notFound } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { getErrorMessage } from '../../../../utils/error-handler';
 import { Product, ApiError } from '../../../../types/dolibarr';
 
 export default function ProductDetailsPage() {
@@ -24,8 +25,7 @@ export default function ProductDetailsPage() {
       await api.delete(`/products/${id}`);
       router.push('/products-services');
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(apiErr.response?.data?.error?.message || 'Impossible de supprimer ce produit.');
+      setError(getErrorMessage(err));
       setDeleting(false);
     }
   };
@@ -40,7 +40,12 @@ export default function ProductDetailsPage() {
           setError('Produit/Service introuvable.');
         }
       } catch (err: unknown) {
-        setError('Erreur lors de la récupération des informations du produit.');
+        const apiErr = err as ApiError;
+        if (apiErr.response?.status === 404) {
+          notFound();
+        } else {
+          setError(getErrorMessage(err));
+        }
       } finally {
         setLoading(false);
       }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
+import { getErrorMessage } from '../../../../utils/error-handler';
 import { Product, ApiError } from '../../../../types/dolibarr';
 
 export default function CreateProductPage() {
@@ -59,11 +60,7 @@ export default function CreateProductPage() {
       const newId = response.data; // Dolibarr API POST returns the ID of the created resource
       router.push(`/products-services/${newId}`);
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      setError(
-        apiErr.response?.data?.error?.message ||
-          "Une erreur s'est produite lors de la création."
-      );
+      setError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }

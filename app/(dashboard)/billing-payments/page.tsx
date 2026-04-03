@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
+import { getErrorMessage } from '../../../utils/error-handler';
 import { Invoice, ApiError } from '../../../types/dolibarr';
 
 export default function BillingPaymentsPage() {
@@ -81,9 +82,7 @@ export default function BillingPaymentsPage() {
         setInvoices([]);
         setHasMore(false);
       } else {
-        setError(
-          "Impossible de charger les factures. Vérifiez votre connexion à l'API."
-        );
+        setError(getErrorMessage(err));
       }
     } finally {
       setLoading(false);
