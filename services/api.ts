@@ -69,7 +69,7 @@ export const api = {
 
     // --- Intercepteur global : Session expirée ---
     if (response.status === 401) {
-      auth.clearAuth();
+      auth.logout();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }

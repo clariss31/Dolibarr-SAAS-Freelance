@@ -1,24 +1,27 @@
 'use client';
 
+/**
+ * @file components/ui/ProfileMenu.tsx
+ * 
+ * Composant de menu utilisateur situé dans la barre de navigation.
+ * 
+ * Gère l'affichage de l'avatar (initiales), les liens vers les réglages profil/entreprise
+ * et la procédure de déconnexion globale.
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { auth } from '../../utils/auth';
 import { userService } from '../../services/user';
 import { User } from '../../types/dolibarr';
 
-// Icône utilisateur (avatar)
+// ---------------------------------------------------------------------------
+// Icônes (SVG)
+// ---------------------------------------------------------------------------
+
 function UserCircleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
     </svg>
@@ -27,15 +30,7 @@ function UserCircleIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <rect x="2" y="7" width="20" height="14" rx="2" />
       <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
       <line x1="12" y1="12" x2="12" y2="17" />
@@ -46,15 +41,7 @@ function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function LogOutIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
@@ -62,45 +49,51 @@ function LogOutIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-/**
- * Menu déroulant de profil utilisateur.
- * Affiche les initiales ou une icône par défaut dans un avatar.
- * Les entrées du menu permettent : Mon Profil, Mon Entreprise, Déconnexion.
- */
-export default function ProfileMenu() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+// ---------------------------------------------------------------------------
+// Composant Principal
+// ---------------------------------------------------------------------------
 
-  // Récupère le profil de l'utilisateur au montage
+export default function ProfileMenu() {
+  const router = useRouter();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // --- États ---
+  const [isOpen, setIsOpen] = useState(false);
+  const [user,   setUser]   = useState<User | null>(null);
+
+  // --- Effets ---
+
+  /** Chargement initial du profil */
   useEffect(() => {
     userService.getCurrentUser().then((u) => {
       if (u) setUser(u);
     });
   }, []);
 
-  // Ferme le menu si on clique en dehors
+  /** Gestion de la fermeture au clic extérieur et touche Echap */
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    };
 
-  // Ferme le menu à l'appui sur Echap
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsOpen(false);
-    }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
-  /** Calcule les initiales à afficher dans l'avatar */
+  // --- Handlers ---
+
+  /** Calcule les initiales de l'avatar */
   const getInitials = (): string => {
     if (user?.firstname && user?.lastname) {
       return `${user.firstname[0]}${user.lastname[0]}`.toUpperCase();
@@ -111,7 +104,7 @@ export default function ProfileMenu() {
     return '?';
   };
 
-  /** Nom complet ou identifiant de l'utilisateur */
+  /** Nom affiché dans l'en-tête du menu */
   const getDisplayName = (): string => {
     if (user?.firstname || user?.lastname) {
       return `${user.firstname ?? ''} ${user.lastname ?? ''}`.trim();
@@ -119,16 +112,21 @@ export default function ProfileMenu() {
     return user?.login ?? 'Profil';
   };
 
+  /**
+   * Déclenche la déconnexion complète.
+   * Supprime tous les cookies de session et redirige vers le login.
+   */
   const handleLogout = () => {
     setIsOpen(false);
-    auth.clearAuth();
-    userService.clearLogin();
+    userService.logout(); // Appelle en cascade auth.logout()
     router.push('/login');
   };
 
+  // --- Rendu ---
+
   return (
     <div className="relative" ref={menuRef}>
-      {/* Bouton déclencheur - avatar avec initiales */}
+      {/* Bouton Avatar */}
       <button
         id="profile-menu-button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -146,7 +144,7 @@ export default function ProfileMenu() {
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* Menu Déroulant */}
       {isOpen && (
         <div
           role="menu"
@@ -154,7 +152,7 @@ export default function ProfileMenu() {
           aria-labelledby="profile-menu-button"
           className="border-border bg-surface ring-border/20 absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border shadow-lg ring-1"
         >
-          {/* En-tête du menu : affiche le nom & login */}
+          {/* En-tête : Nom & Email */}
           <div className="border-border border-b px-4 py-3">
             <p className="text-foreground truncate text-sm font-semibold">
               {getDisplayName()}
@@ -165,7 +163,7 @@ export default function ProfileMenu() {
           </div>
 
           <div className="py-1">
-            {/* Lien Mon Profil */}
+            {/* Lien Profil */}
             <Link
               href="/settings/user"
               role="menuitem"
@@ -176,7 +174,7 @@ export default function ProfileMenu() {
               Profil
             </Link>
 
-            {/* Lien Mon Entreprise */}
+            {/* Lien Entreprise */}
             <Link
               href="/settings/company"
               role="menuitem"
