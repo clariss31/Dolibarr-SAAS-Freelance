@@ -251,7 +251,7 @@ export default function ProductDetailsPage() {
                   Stock physique (réel)
                 </p>
                 <div className="bg-background border-border text-foreground inline-flex items-center rounded-md border px-4 py-2 font-bold">
-                  {product.reel_stock || '0'}
+                  {product.stock_reel || '0'}
                 </div>
               </div>
               <div>
@@ -259,7 +259,7 @@ export default function ProductDetailsPage() {
                   Stock virtuel (théorique)
                 </p>
                 <div className="bg-background border-border text-foreground inline-flex items-center rounded-md border px-4 py-2 font-bold">
-                  {product.virtual_stock || '0'}
+                  {product.stock_theorique || '0'}
                 </div>
               </div>
             </div>

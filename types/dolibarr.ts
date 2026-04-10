@@ -39,8 +39,8 @@ export interface Product {
   price_ttc?: string | number;
   tva_tx?: string | number;
   description?: string;
-  reel_stock?: string | number;
-  virtual_stock?: string | number;
+  stock_reel?: string | number;
+  stock_theorique?: string | number;
   tosell: string | number; // 1 = en vente, 0 = hors vente
   tobuy: string | number; // 1 = en achat, 0 = hors achat
   type: string | number; // 0 = produit, 1 = service

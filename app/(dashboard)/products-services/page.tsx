@@ -156,24 +156,24 @@ export default function ProductsServicesPage() {
       {/* Tableau */}
       <div className="border-border bg-surface ring-border/50 overflow-hidden rounded-lg border shadow-sm ring-1">
         <div className="overflow-x-auto">
-          <table className="divide-border min-w-full divide-y">
+          <table className="divide-border min-w-full divide-y table-fixed">
             <thead className="bg-background">
               <tr>
                 <th
                   scope="col"
-                  className="text-foreground w-[15%] py-3.5 pr-3 pl-4 text-left text-sm font-semibold sm:pl-6"
+                  className="text-foreground w-40 py-3.5 pr-3 pl-4 text-left text-sm font-semibold sm:pl-6"
                 >
                   Référence
                 </th>
                 <th
                   scope="col"
-                  className="text-foreground w-[25%] px-3 py-3.5 text-left text-sm font-semibold"
+                  className="text-foreground px-3 py-3.5 text-left text-sm font-semibold"
                 >
                   Libellé
                 </th>
                 <th
                   scope="col"
-                  className="text-foreground w-[10%] px-3 py-3.5 text-right text-sm font-semibold"
+                  className="text-foreground w-32 px-3 py-3.5 text-right text-sm font-semibold"
                 >
                   Prix HT
                 </th>
@@ -181,13 +181,13 @@ export default function ProductsServicesPage() {
                   <>
                     <th
                       scope="col"
-                      className="text-foreground w-[10%] px-3 py-3.5 text-center text-sm font-semibold"
+                      className="text-foreground w-32 px-3 py-3.5 text-center text-sm font-semibold"
                     >
                       Stock physique
                     </th>
                     <th
                       scope="col"
-                      className="text-foreground w-[10%] px-3 py-3.5 text-center text-sm font-semibold"
+                      className="text-foreground w-32 px-3 py-3.5 text-center text-sm font-semibold"
                     >
                       Stock virtuel
                     </th>
@@ -195,13 +195,13 @@ export default function ProductsServicesPage() {
                 )}
                 <th
                   scope="col"
-                  className="text-foreground w-[15%] px-3 py-3.5 text-center text-sm font-semibold"
+                  className="text-foreground w-32 px-3 py-3.5 text-center text-sm font-semibold"
                 >
                   État (Vente)
                 </th>
                 <th
                   scope="col"
-                  className="text-foreground w-[15%] px-3 py-3.5 text-center text-sm font-semibold"
+                  className="text-foreground w-32 px-3 py-3.5 text-center text-sm font-semibold"
                 >
                   État (Achat)
                 </th>
@@ -249,10 +249,10 @@ export default function ProductsServicesPage() {
                     {typeFilter !== 'service' && (
                       <>
                         <td className="text-muted px-3 py-4 text-center text-sm whitespace-nowrap">
-                          {product.reel_stock || '0'}
+                          {product.stock_reel || '0'}
                         </td>
                         <td className="text-muted px-3 py-4 text-center text-sm whitespace-nowrap">
-                          {product.virtual_stock || '0'}
+                          {product.stock_theorique || '0'}
                         </td>
                       </>
                     )}

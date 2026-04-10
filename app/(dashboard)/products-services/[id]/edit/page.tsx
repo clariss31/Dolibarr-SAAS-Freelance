@@ -15,6 +15,15 @@ export default function EditProductPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const [productData, setProductData] = useState<Product | null>(null);
+
+  // Stock Adjustment States
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
+  const [stockQty, setStockQty] = useState<number | ''>('');
+  const [adjustingStock, setAdjustingStock] = useState(false);
+  const [stockMessage, setStockMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+
   const [formData, setFormData] = useState({
     ref: '',
     label: '',
@@ -27,11 +36,16 @@ export default function EditProductPage() {
   });
 
   useEffect(() => {
-    const fetchProduct = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get(`/products/${id}`);
-        if (response.data) {
-          const product: Product = response.data;
+        const [prodRes, wareRes] = await Promise.all([
+          api.get(`/products/${id}`),
+          api.get(`/warehouses?limit=100`).catch(() => ({ data: [] }))
+        ]);
+
+        if (prodRes.data) {
+          const product: Product = prodRes.data;
+          setProductData(product);
 
           const decodeHtml = (html: string) => {
             // Prendre en compte caractères spéciaux
@@ -55,14 +69,55 @@ export default function EditProductPage() {
         } else {
           setError('Produit introuvable.');
         }
+
+        if (wareRes.data && wareRes.data.length > 0) {
+          setWarehouses(wareRes.data);
+          setSelectedWarehouse(wareRes.data[0].id);
+        }
       } catch (err: unknown) {
         setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
     };
-    if (id) fetchProduct();
+    if (id) fetchData();
   }, [id]);
+
+  const handleAdjustStock = async () => {
+    if (!stockQty || stockQty === 0 || !selectedWarehouse) return;
+    
+    setAdjustingStock(true);
+    setStockMessage(null);
+    try {
+      await api.post('/stockmovements', {
+        product_id: parseInt(id),
+        warehouse_id: parseInt(selectedWarehouse),
+        qty: Number(stockQty)
+      });
+      
+      const qtyNum = Number(stockQty);
+      
+      // Update local object optimistically
+      setProductData(prev => prev ? {
+        ...prev,
+        stock_reel: String(Number(prev.stock_reel || 0) + qtyNum),
+        stock_theorique: String(Number(prev.stock_theorique || 0) + qtyNum)
+      } : prev);
+      
+      setStockMessage({ type: 'success', text: 'Stock mis à jour avec succès.' });
+      setStockQty('');
+      
+      // Refetch background
+      api.get(`/products/${id}?_t=${Date.now()}`).then(response => {
+        if (response.data) setProductData(response.data);
+      }).catch(console.error);
+      
+    } catch (err: unknown) {
+      setStockMessage({ type: 'error', text: getErrorMessage(err) || 'Erreur lors de la mise à jour.' });
+    } finally {
+      setAdjustingStock(false);
+    }
+  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -375,6 +430,64 @@ export default function EditProductPage() {
           </button>
         </div>
       </form>
+
+      {/* Stock Adjustment Section (Only for Products) */}
+      {formData.type === '0' && productData && (
+        <div className="border-border bg-surface rounded-xl border shadow-sm p-6 mb-8 mt-8">
+          <h2 className="text-foreground text-lg font-bold tracking-tight mb-1">Ajuster le stock physique</h2>
+          <p className="text-muted text-sm mb-5">
+            Stock physique actuel : <span className="font-bold text-foreground mx-1">{productData.stock_reel || '0'}</span> 
+            (Virtuel: {productData.stock_theorique || '0'})
+          </p>
+          
+          {stockMessage && (
+            <div className={`mb-5 p-3 text-sm rounded-md ${stockMessage.type === 'success' ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20' : 'bg-red-50 text-red-700 ring-1 ring-red-600/20'}`}>
+              {stockMessage.text}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">Entrepôt cible</label>
+              <select
+                value={selectedWarehouse}
+                onChange={(e) => setSelectedWarehouse(e.target.value)}
+                className="w-full text-sm rounded-md border-0 bg-background text-foreground ring-1 ring-inset ring-border px-3 py-2 focus:ring-2 focus:ring-inset focus:ring-primary appearance-none"
+              >
+                {warehouses.length === 0 ? (
+                  <option value="" className="bg-background text-foreground">Aucun entrepôt configuré</option>
+                ) : (
+                  warehouses.map(w => (
+                    <option key={w.id} value={w.id} className="bg-background text-foreground">
+                      {w.label || w.ref || w.id}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">Quantité à ajuster</label>
+              <div className="flex space-x-3">
+                <input 
+                  type="number"
+                  value={stockQty}
+                  onChange={(e) => setStockQty(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="Ex: +5 ou -2"
+                  className="flex-1 text-sm rounded-md border-0 bg-background text-foreground ring-1 ring-inset ring-border px-3 py-2 focus:ring-2 focus:ring-inset focus:ring-primary"
+                />
+                <button
+                  type="button"
+                  onClick={handleAdjustStock}
+                  disabled={adjustingStock || warehouses.length === 0 || !stockQty}
+                  className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  {adjustingStock ? 'En cours...' : 'Ajuster'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
