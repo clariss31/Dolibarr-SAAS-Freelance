@@ -1,27 +1,59 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Product, ApiError } from '../../../../types/dolibarr';
 
 export default function CreateProductPage() {
+  return (
+    <Suspense fallback={<p>Chargement...</p>}>
+      <CreateProductForm />
+    </Suspense>
+  );
+}
+
+function CreateProductForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialType = searchParams.get('type') || '0';
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Indique si l'entreprise est assujettie à la TVA (lu depuis /setup/company)
+  const [isTvaAssujetti, setIsTvaAssujetti] = useState(true);
+
   const [formData, setFormData] = useState({
     ref: '',
     label: '',
-    type: '0', // 0 = produit, 1 = service
+    type: initialType, // 0 = produit, 1 = service
     price: '',
     tva_tx: '',
     description: '',
     tosell: '1',
     tobuy: '1',
   });
+
+  useEffect(() => {
+    // Vérification de l'assujettissement à la TVA de l'entreprise
+    api
+      .get('/setup/company')
+      .then((res) => {
+        if (res.data) {
+          const liable = String(res.data.tva_assuj) === '1';
+          setIsTvaAssujetti(liable);
+          // Si non assujetti, on force la TVA à 0 par défaut
+          if (!liable) {
+            setFormData((prev) => ({ ...prev, tva_tx: '0' }));
+          }
+        }
+      })
+      .catch(() => {
+        // En cas d'erreur, on garde la valeur par défaut (assujetti)
+      });
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -178,48 +210,73 @@ export default function CreateProductPage() {
               </div>
             </div>
 
+            {/* Ligne Prix HT + TVA côte à côte */}
             <div className="sm:col-span-3">
-              <label
-                htmlFor="price"
-                className="text-foreground block text-sm leading-6 font-medium"
-              >
-                Prix HT
-              </label>
-              <div className="relative mt-2 rounded-md shadow-sm">
-                <input
-                  type="number"
-                  step="0.01"
-                  name="price"
-                  id="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 py-1.5 pr-10 pl-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-                />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span className="text-muted sm:text-sm">€</span>
+              <div className="flex items-end gap-2">
+                {/* Champ Prix HT */}
+                <div className="flex-1">
+                  <label
+                    htmlFor="price"
+                    className="text-foreground block text-sm leading-6 font-medium"
+                  >
+                    Prix HT
+                  </label>
+                  <div className="relative mt-2 rounded-md shadow-sm">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      name="price"
+                      id="price"
+                      value={formData.price}
+                      onChange={(e) => {
+                        // Limite à 2 décimales
+                        const val = e.target.value;
+                        const rounded = val.includes('.')
+                          ? val.slice(0, val.indexOf('.') + 3)
+                          : val;
+                        setFormData((prev) => ({ ...prev, price: rounded }));
+                      }}
+                      placeholder="0.00"
+                      className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 py-1.5 pr-7 pl-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                    />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                      <span className="text-muted sm:text-sm">€</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="sm:col-span-3">
-              <label
-                htmlFor="tva_tx"
-                className="text-foreground block text-sm leading-6 font-medium"
-              >
-                Taux TVA
-              </label>
-              <div className="relative mt-2 rounded-md shadow-sm">
-                <input
-                  type="number"
-                  step="0.1"
-                  name="tva_tx"
-                  id="tva_tx"
-                  value={formData.tva_tx}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary placeholder:text-muted block w-full rounded-md border-0 py-1.5 pr-10 pl-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-                />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span className="text-muted sm:text-sm">%</span>
+                {/* Sélection du taux de TVA */}
+                <div>
+                  <label
+                    htmlFor="tva_tx"
+                    className="text-foreground block text-sm leading-6 font-medium"
+                  >
+                    TVA
+                  </label>
+                  <div className="mt-2">
+                    <select
+                      id="tva_tx"
+                      name="tva_tx"
+                      value={formData.tva_tx}
+                      onChange={handleChange}
+                      disabled={!isTvaAssujetti}
+                      title={
+                        !isTvaAssujetti
+                          ? "Vous n'êtes pas assujetti à la TVA"
+                          : undefined
+                      }
+                      className={`bg-background text-foreground ring-border focus:ring-primary block rounded-md border-0 px-2 py-1.5 text-sm shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset ${
+                        !isTvaAssujetti ? 'cursor-not-allowed opacity-50' : ''
+                      }`}
+                    >
+                      <option value="0">0 %</option>
+                      <option value="2.1">2,1 %</option>
+                      <option value="5.5">5,5 %</option>
+                      <option value="10">10 %</option>
+                      <option value="20">20 %</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

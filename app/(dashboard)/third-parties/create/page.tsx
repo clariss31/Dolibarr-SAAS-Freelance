@@ -1,13 +1,23 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { ApiError } from '../../../../types/dolibarr';
 
 export default function CreateThirdPartyPage() {
+  return (
+    <Suspense fallback={<p>Chargement...</p>}>
+      <CreateThirdPartyForm />
+    </Suspense>
+  );
+}
+
+function CreateThirdPartyForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialType = searchParams.get('type') || 'client';
 
   const [formData, setFormData] = useState({
     name: '',
@@ -21,7 +31,7 @@ export default function CreateThirdPartyPage() {
     tva_intra: '',
     idprof2: '',
     code_client: '',
-    t_type: 'client',
+    t_type: initialType,
   });
 
   const [saving, setSaving] = useState(false);
@@ -73,7 +83,7 @@ export default function CreateThirdPartyPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="space-y-8">
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
@@ -107,7 +117,7 @@ export default function CreateThirdPartyPage() {
         {/* Informations de base */}
         <div className="border-border border-b pb-6">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Informations Principales
+            Informations principales
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>
@@ -115,7 +125,7 @@ export default function CreateThirdPartyPage() {
                 htmlFor="name"
                 className="text-foreground block text-sm leading-6 font-medium"
               >
-                Nom / Raison Sociale *
+                Nom / Raison sociale *
               </label>
               <div className="mt-2">
                 <input
@@ -134,7 +144,7 @@ export default function CreateThirdPartyPage() {
                 htmlFor="code_client"
                 className="text-foreground block text-sm leading-6 font-medium"
               >
-                Code Client
+                Code client
               </label>
               <div className="mt-2">
                 <input
@@ -154,14 +164,14 @@ export default function CreateThirdPartyPage() {
         {/* Classification / Type */}
         <div className="border-border border-b pb-6">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Classification (Type de Tiers)
+            Classification
           </h2>
           <div className="mt-4 max-w-md">
             <label
               htmlFor="t_type"
               className="text-foreground block text-sm leading-6 font-medium"
             >
-              Type Exclusif
+              Type
             </label>
             <div className="mt-2">
               <select
@@ -182,7 +192,7 @@ export default function CreateThirdPartyPage() {
         {/* Contact */}
         <div className="border-border border-b pb-6">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Coordonnées de Contact
+            Coordonnées de contact
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
             <div>
@@ -226,7 +236,7 @@ export default function CreateThirdPartyPage() {
                 htmlFor="url"
                 className="text-foreground block text-sm leading-6 font-medium"
               >
-                Site Web (URL)
+                Site web (URL)
               </label>
               <div className="mt-2">
                 <input
@@ -245,7 +255,7 @@ export default function CreateThirdPartyPage() {
         {/* Adresse */}
         <div className="border-border border-b pb-6">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Adresse Postale
+            Adresse postale
           </h2>
           <div className="mt-4 space-y-4">
             <div>
@@ -329,7 +339,7 @@ export default function CreateThirdPartyPage() {
         {/* Legal */}
         <div className="pb-2">
           <h2 className="text-foreground text-base leading-7 font-semibold">
-            Identifiants Légaux
+            Identifiants légaux
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>

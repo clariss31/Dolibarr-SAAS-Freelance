@@ -60,6 +60,7 @@ export interface ProposalLine {
   remise_percent?: number | string;
   total_ht: number | string;
   total_ttc: number | string;
+  product_type?: number | string;
 }
 
 // Définition du type proposition
@@ -96,4 +97,33 @@ export interface Invoice {
   paye: string | number;
   statut: string | number;
   lines?: ProposalLine[];
+}
+
+// Définition du type utilisateur Dolibarr
+export interface User {
+  id: string | number;
+  login: string;
+  lastname?: string;
+  firstname?: string;
+  email?: string;
+  job?: string;
+  phone?: string;
+  statut?: string | number;
+  admin?: string | number;
+}
+
+// Définition du type configuration organisation
+export interface Organization {
+  name?: string;
+  address?: string;
+  zip?: string;
+  town?: string;
+  country_id?: string | number;
+  email?: string;
+  phone?: string;
+  url?: string;
+  idprof1?: string;   // SIRET
+  idprof2?: string;   // SIREN
+  tva_assuj?: string | number; // 1 = assujetti TVA, 0 = non
+  tva_intra?: string; // Numéro TVA intracommunautaire
 }

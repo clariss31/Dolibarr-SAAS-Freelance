@@ -61,6 +61,7 @@ export default function ProposalLines({
 }: ProposalLinesProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [isTvaAssujetti, setIsTvaAssujetti] = useState(true);
 
   // Sélections de la ligne en cours d'ajout
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -85,6 +86,13 @@ export default function ProposalLines({
       }
     };
     fetchProducts();
+
+    // Vérification de l'assujettissement à la TVA
+    api.get('/setup/company').then((res) => {
+      if (res.data) {
+        setIsTvaAssujetti(String(res.data.tva_assuj) === '1');
+      }
+    }).catch(() => {});
   }, []);
 
   /** Ajoute une ligne avec le produit sélectionné */
@@ -95,7 +103,7 @@ export default function ProposalLines({
 
     const qty = selectedQty > 0 ? selectedQty : 1;
     const subprice = Number(product.price) || 0;
-    const tva_tx = Number(product.tva_tx) || 0;
+    const tva_tx = isTvaAssujetti ? (Number(product.tva_tx) || 0) : 0;
     const remise_percent = 0;
     const base_ht = qty * subprice;
     const total_ht = parseFloat(
@@ -297,7 +305,11 @@ export default function ProposalLines({
                             Number(e.target.value)
                           )
                         }
-                        className="bg-background text-foreground ring-border focus:ring-primary w-24 rounded-md px-2 py-1 text-right text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+                        disabled={!isTvaAssujetti}
+                        title={!isTvaAssujetti ? "L'entreprise n'est pas assujettie à la TVA" : undefined}
+                        className={`bg-background text-foreground ring-border focus:ring-primary w-24 rounded-md px-2 py-1 text-right text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset ${
+                          !isTvaAssujetti ? 'cursor-not-allowed opacity-50' : ''
+                        }`}
                       >
                         <option value="0">0 %</option>
                         <option value="2.1">2.1 %</option>

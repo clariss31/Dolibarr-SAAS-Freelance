@@ -57,7 +57,7 @@ export const api = {
         }
 
         if (!response.ok) {
-            const error = new Error(response.statusText) as Error & ApiError;
+            const error = new Error(response.statusText || 'API Error') as any;
             error.response = { status: response.status, data };
             throw error;
         }

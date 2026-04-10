@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
 import { auth } from '../../../utils/auth';
+import { userService } from '../../../services/user';
 import { getErrorMessage } from '../../../utils/error-handler';
 
 export default function LoginPage() {
@@ -38,6 +39,8 @@ export default function LoginPage() {
         response.data.success.token
       ) {
         auth.setAuth(response.data.success.token, apiUrl);
+        // Mémorise le login pour permettre la récupération du profil en secours
+        userService.saveLogin(login);
         router.push('/');
       } else {
         setError('Identifiants incorrects.');

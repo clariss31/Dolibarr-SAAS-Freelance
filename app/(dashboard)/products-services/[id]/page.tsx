@@ -18,7 +18,12 @@ export default function ProductDetailsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer définitivement ce produit ?')) return;
+    if (
+      !window.confirm(
+        'Êtes-vous sûr de vouloir supprimer définitivement ce produit ?'
+      )
+    )
+      return;
     setDeleting(true);
     setError('');
     try {
@@ -126,47 +131,45 @@ export default function ProductDetailsPage() {
         <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
           <div className="border-border bg-background border-b px-5 py-4">
             <h3 className="text-foreground text-base leading-6 font-semibold">
-              Situation & Nature
+              Type & état
             </h3>
           </div>
-          <div className="space-y-5 p-5">
+          <div className="flex flex-wrap items-end gap-x-12 gap-y-6 p-5">
             <div>
               <p className="text-muted text-xs font-medium tracking-wider uppercase">
                 Type
               </p>
               <p className="text-foreground mt-1 font-medium">
-                {isService ? 'Service' : 'Produit physique'}
+                {isService ? 'Service' : 'Produit'}
               </p>
             </div>
-            <div className="flex space-x-6">
-              <div>
-                <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
-                  État (Vente)
-                </p>
-                {String(product.tosell) === '1' ? (
-                  <span className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300">
-                    En vente
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                    Hors vente
-                  </span>
-                )}
-              </div>
-              <div>
-                <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
-                  État (Achat)
-                </p>
-                {String(product.tobuy) === '1' ? (
-                  <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                    En achat
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                    Hors achat
-                  </span>
-                )}
-              </div>
+            <div>
+              <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
+                État (Vente)
+              </p>
+              {String(product.tosell) === '1' ? (
+                <span className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300">
+                  En vente
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                  Hors vente
+                </span>
+              )}
+            </div>
+            <div>
+              <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
+                État (Achat)
+              </p>
+              {String(product.tobuy) === '1' ? (
+                <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                  En achat
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                  Hors achat
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -175,37 +178,35 @@ export default function ProductDetailsPage() {
         <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
           <div className="border-border bg-background border-b px-5 py-4">
             <h3 className="text-foreground text-base leading-6 font-semibold">
-              Tarification
+              Prix de vente
             </h3>
           </div>
-          <div className="space-y-4 p-5">
-            <div className="bg-background border-border flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                  Prix hors taxe (HT)
-                </p>
-                <p className="text-foreground mt-1 text-2xl font-bold">
-                  {product.price
-                    ? `${parseFloat(String(product.price)).toFixed(2)} €`
-                    : '0.00 €'}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                  Taux TVA
-                </p>
-                <p className="text-foreground mt-1 text-sm font-medium">
-                  {product.tva_tx
-                    ? `${parseFloat(String(product.tva_tx))} %`
-                    : 'Non défini'}
-                </p>
-              </div>
+          <div className="flex flex-wrap items-end gap-x-12 gap-y-6 p-5">
+            <div>
+              <p className="text-muted text-xs font-medium tracking-wider uppercase">
+                Prix HT
+              </p>
+              <p className="text-foreground mt-1 text-2xl font-bold">
+                {product.price
+                  ? `${parseFloat(String(product.price)).toFixed(2)} €`
+                  : '0.00 €'}
+              </p>
             </div>
             <div>
               <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                Prix Toutes Taxes Comprises (TTC)
+                TVA
               </p>
-              <p className="text-foreground mt-1 text-sm font-medium">
+              <p className="text-foreground mt-1 text-2xl font-bold">
+                {product.tva_tx
+                  ? `${parseFloat(String(product.tva_tx))} %`
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted text-xs font-medium tracking-wider uppercase">
+                Prix TTC
+              </p>
+              <p className="text-foreground mt-1 text-2xl font-bold">
                 {product.price_ttc
                   ? `${parseFloat(String(product.price_ttc)).toFixed(2)} €`
                   : '0.00 €'}
@@ -230,9 +231,7 @@ export default function ProductDetailsPage() {
                 }}
               />
             ) : (
-              <p className="text-muted text-sm italic">
-                Aucune description fournie pour ce produit/service.
-              </p>
+              <p className="text-muted text-sm italic">Aucune description.</p>
             )}
           </div>
         </div>
@@ -248,7 +247,7 @@ export default function ProductDetailsPage() {
             <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
               <div>
                 <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
-                  Stock physique (réel)
+                  Stock physique
                 </p>
                 <div className="bg-background border-border text-foreground inline-flex items-center rounded-md border px-4 py-2 font-bold">
                   {product.stock_reel || '0'}
@@ -256,7 +255,7 @@ export default function ProductDetailsPage() {
               </div>
               <div>
                 <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
-                  Stock virtuel (théorique)
+                  Stock virtuel
                 </p>
                 <div className="bg-background border-border text-foreground inline-flex items-center rounded-md border px-4 py-2 font-bold">
                   {product.stock_theorique || '0'}

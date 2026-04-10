@@ -554,13 +554,13 @@ export default function DashboardRootPage() {
             title="Derniers produits"
             items={recentProducts}
             type="product"
-            createLink="/products-services/create"
+            createLink="/products-services/create?type=0"
           />
           <RecentList
             title="Derniers services"
             items={recentServices}
             type="product"
-            createLink="/products-services/create"
+            createLink="/products-services/create?type=1"
           />
         </div>
 

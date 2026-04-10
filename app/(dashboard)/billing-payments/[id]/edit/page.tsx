@@ -11,7 +11,7 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
   const resolvedLabel: string =
     line.product_label || line.label || line.description || `Ligne ${index + 1}`;
   const lineId = line.id ?? line.rowid;
-  const unitPrice = Number(line.subprice ?? line.up ?? 0);
+  const unitPrice = Number(line.subprice ?? 0);
   const qty = Number(line.qty) || 1;
   const tva = Number(line.tva_tx) || 0;
   const totalHt = Number(line.total_ht) || parseFloat((qty * unitPrice).toFixed(2));
@@ -21,11 +21,12 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
     _key: `existing-${lineId ?? index}-${Date.now()}`,
     id: lineId ? String(lineId) : undefined,
     fk_product: line.fk_product ? String(line.fk_product) : undefined,
-    product_type: 0,
+    product_type: Number(line.product_type) || 0,
     label: resolvedLabel,
     qty,
     subprice: unitPrice,
     tva_tx: tva,
+    remise_percent: Number(line.remise_percent) || 0,
     total_ht: totalHt,
     total_ttc: totalTtc,
   };
@@ -201,7 +202,7 @@ function EditInvoiceContent({ id }: { id: string }) {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-8">
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">

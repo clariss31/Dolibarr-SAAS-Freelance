@@ -53,13 +53,15 @@ export default function ProductsServicesPage() {
       if (response.data && Array.isArray(response.data)) {
         setProducts(response.data);
         setHasMore(response.data.length === limit);
-        
+
         // Count from headers
         const total = response.headers?.get('X-Total-Count');
         if (total) {
           setTotalItems(parseInt(total, 10));
         } else {
-          setTotalItems(response.data.length + (response.data.length === limit ? limit : 0));
+          setTotalItems(
+            response.data.length + (response.data.length === limit ? limit : 0)
+          );
         }
       } else {
         setProducts([]);
@@ -166,7 +168,7 @@ export default function ProductsServicesPage() {
       {/* Tableau */}
       <div className="border-border bg-surface ring-border/50 overflow-hidden rounded-lg border shadow-sm ring-1">
         <div className="overflow-x-auto">
-          <table className="divide-border min-w-full divide-y table-fixed">
+          <table className="divide-border min-w-full table-fixed divide-y">
             <thead className="bg-background">
               <tr>
                 <th
@@ -305,7 +307,10 @@ export default function ProductsServicesPage() {
                 {totalItems > 0 && (
                   <>
                     {' '}
-                    / <span className="font-medium">{Math.ceil(totalItems / limit)}</span>
+                    /{' '}
+                    <span className="font-medium">
+                      {Math.ceil(totalItems / limit)}
+                    </span>
                   </>
                 )}
               </p>

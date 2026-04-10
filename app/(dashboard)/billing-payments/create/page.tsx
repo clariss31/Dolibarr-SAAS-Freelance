@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { ApiError } from '../../../../types/dolibarr';
@@ -18,7 +18,17 @@ interface ThirdPartyOption {
 }
 
 export default function CreateInvoicePage() {
+  return (
+    <Suspense fallback={<p>Chargement...</p>}>
+      <CreateInvoiceForm />
+    </Suspense>
+  );
+}
+
+function CreateInvoiceForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialType = (searchParams.get('type') as InvoiceType) || 'client';
 
   const today = new Date().toISOString().split('T')[0];
   const thirtyDaysLater = new Date();
@@ -26,7 +36,8 @@ export default function CreateInvoicePage() {
   const defaultDatelimit = thirtyDaysLater.toISOString().split('T')[0];
 
   // Type de facture : client ou fournisseur
-  const [invoiceType, setInvoiceType] = useState<InvoiceType>('client');
+  // Type de facture : client ou fournisseur
+  const [invoiceType, setInvoiceType] = useState<InvoiceType>(initialType);
 
   const [formData, setFormData] = useState({
     socid: '',
@@ -122,7 +133,7 @@ export default function CreateInvoicePage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-8">
       {/* En-tête */}
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
@@ -170,7 +181,7 @@ export default function CreateInvoicePage() {
                     className={`focus-visible:outline-primary px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
                       invoiceType === 'client'
                         ? 'bg-primary text-background'
-                        : 'text-muted hover:text-background'
+                        : 'text-muted'
                     }`}
                   >
                     Client
@@ -182,7 +193,7 @@ export default function CreateInvoicePage() {
                     className={`border-border focus-visible:outline-primary border-l px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
                       invoiceType === 'supplier'
                         ? 'bg-primary text-background'
-                        : 'text-muted hover:text-background'
+                        : 'text-muted'
                     }`}
                   >
                     Fournisseur

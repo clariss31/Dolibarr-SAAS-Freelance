@@ -1,9 +1,11 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { auth } from '../../utils/auth';
+import ProfileMenu from '../../components/ui/ProfileMenu';
+import { useRouter } from 'next/navigation';
 
 function HomeIcon(props: React.SVGProps<SVGSVGElement>) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
@@ -25,10 +27,6 @@ function CreditCardIcon(props: React.SVGProps<SVGSVGElement>) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>;
 }
 
-function LogOutIcon(props: React.SVGProps<SVGSVGElement>) {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
-}
-
 const navigation = [
   { name: 'Tableau de bord', href: '/', icon: HomeIcon },
   { name: 'Tiers', href: '/third-parties', icon: UsersIcon },
@@ -48,18 +46,13 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
-    // Secure dashboard route (client-side fallback/backup for middleware)
+    // Vérification côté client de l'authentification (fallback du middleware)
     if (!auth.isAuthenticated()) {
       router.push('/login');
     }
   }, [router]);
 
-  const handleLogout = () => {
-    auth.clearAuth();
-    router.push('/login');
-  };
-
-  if (!mounted) return null; // Prevent hydration mismatch
+  if (!mounted) return null; // Empêche les erreurs d'hydratation
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -89,15 +82,9 @@ export default function DashboardLayout({
             })}
           </nav>
 
+          {/* Icône profil avec menu déroulant */}
           <div className="ml-4 flex items-center border-l border-border pl-4 shrink-0">
-            <button
-              onClick={handleLogout}
-              className="flex flex-col items-center justify-center p-2 text-xs font-medium text-red-600 transition-colors hover:text-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:flex-row sm:space-x-2 sm:text-sm"
-              aria-label="Se déconnecter"
-            >
-              <LogOutIcon className="h-5 w-5 sm:mb-0" />
-              <span className="mt-1 sm:mt-0">Déconnexion</span>
-            </button>
+            <ProfileMenu />
           </div>
         </div>
       </header>
@@ -110,3 +97,4 @@ export default function DashboardLayout({
     </div>
   );
 }
+
