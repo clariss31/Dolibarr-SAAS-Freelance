@@ -1,16 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * @file app/(dashboard)/third-parties/[id]/edit/page.tsx
+ *
+ * Page de modification d'un tiers (Client, Prospect, Fournisseur) Dolibarr.
+ *
+ * Fonctionnalités :
+ * - Chargement et pré-remplissage des données actuelles.
+ * - Gestion granulaire de la classification (Conversion entre type client/fournisseur/prospect).
+ * - Mise à jour des coordonnées (Email, Tél, Site, Adresse).
+ * - Gestion des identifiants légaux (SIRET, TVA).
+ * - Possibilité de suppression définitive du tiers.
+ */
+
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
 import { getErrorMessage } from '../../../../../utils/error-handler';
 import { ApiError } from '../../../../../types/dolibarr';
+
+// ---------------------------------------------------------------------------
+// Composant Principal
+// ---------------------------------------------------------------------------
 
 export default function EditThirdPartyPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
 
+  // --- États ---
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,60 +41,77 @@ export default function EditThirdPartyPage() {
     tva_intra: '',
     idprof2: '',
     code_client: '',
-    t_type: 'client',
+    t_type: 'client', // Valeur logique interne : client, prospect, fournisseur
   });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchTier = async () => {
-      try {
-        const response = await api.get(`/thirdparties/${id}`);
-        if (response.data) {
-          const d = response.data;
-          setFormData({
-            name: d.name || '',
-            email: d.email || '',
-            phone: d.phone || '',
-            url: d.url || '',
-            address: d.address || '',
-            zip: d.zip || '',
-            town: d.town || '',
-            country: d.country || '',
-            tva_intra: d.tva_intra || '',
-            idprof2: d.idprof2 || '',
-            code_client: d.code_client || '',
-            t_type:
-              d.fournisseur == 1
-                ? 'fournisseur'
-                : d.client == 2 || d.client == 3
-                  ? 'prospect'
-                  : 'client',
-          });
+  // --- Initialisation ---
+
+  /** Récupère les données existantes du tiers */
+  const fetchTier = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await api.get(`/thirdparties/${id}`);
+      if (response.data) {
+        const d = response.data;
+
+        // Déduction du type simplifié pour le formulaire
+        let deducedType = 'client';
+        if (String(d.fournisseur) === '1') {
+          deducedType = 'fournisseur';
+        } else if (String(d.client) === '2' || String(d.client) === '3') {
+          deducedType = 'prospect';
         }
-      } catch (err) {
-        setError(getErrorMessage(err));
-      } finally {
-        setLoading(false);
+
+        setFormData({
+          name: d.name || '',
+          email: d.email || '',
+          phone: d.phone || '',
+          url: d.url || '',
+          address: d.address || '',
+          zip: d.zip || '',
+          town: d.town || '',
+          country: d.country || '',
+          tva_intra: d.tva_intra || '',
+          idprof2: d.idprof2 || '',
+          code_client: d.code_client || '',
+          t_type: deducedType,
+        });
       }
-    };
-    if (id) fetchTier();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
+  useEffect(() => {
+    fetchTier();
+  }, [fetchTier]);
+
+  // --- Handlers ---
+
+  /** Gère les changements de champs standard */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  /** Soumission de la mise à jour */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError('');
 
-    // Le serveur de Dolibarr attend des Types dissociés pour Client et Fournisseur
+    // Mapping du type simplifié vers le schéma Dolibarr (client vs fournisseur)
     const payload: Record<string, unknown> = {
       ...formData,
       client:
@@ -87,47 +122,49 @@ export default function EditThirdPartyPage() {
             : 0,
       fournisseur: formData.t_type === 'fournisseur' ? 1 : 0,
     };
+
+    // On retire la clé temporaire du payload
     delete payload.t_type;
 
     try {
-      await api.put(`/thirdparties/${id}`, payload); // Mise à jour du tiers
-      router.push(`/third-parties/${id}`); // Redirection vers la fiche du tiers
+      await api.put(`/thirdparties/${id}`, payload);
+      router.push(`/third-parties/${id}`);
     } catch (err: unknown) {
       setError(getErrorMessage(err));
       setSaving(false);
     }
   };
 
+  /** Suppression définitive */
   const handleDelete = async () => {
-    if (
-      !window.confirm(
-        'Êtes-vous sûr de vouloir supprimer définitivement ce tiers ? Cette action est irréversible et supprimera le tiers de votre Dolibarr.'
-      )
-    ) {
-      return;
-    }
-    
+    const message =
+      'Êtes-vous sûr de vouloir supprimer définitivement ce tiers ? Cette action supprimera également ses données associées dans Dolibarr.';
+    if (!window.confirm(message)) return;
+
+    setSaving(true);
     setError('');
     try {
       await api.delete(`/thirdparties/${id}`);
       router.push('/third-parties');
     } catch (err: unknown) {
       setError(getErrorMessage(err));
+      setSaving(false);
     }
   };
 
+  // --- Rendu ---
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-muted text-center text-sm">
-          Chargement de la fiche complète...
-        </div>
+      <div className="text-muted flex items-center justify-center py-20 text-sm italic">
+        Chargement de la fiche complète...
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
@@ -138,9 +175,17 @@ export default function EditThirdPartyPage() {
           </p>
         </div>
         <div className="flex items-center space-x-6">
-          
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving}
+            className="text-sm font-medium text-red-500 transition-colors hover:text-red-700 disabled:opacity-50"
+          >
+            Supprimer
+          </button>
           <button
             onClick={() => router.back()}
+            type="button"
             className="text-muted hover:text-foreground text-sm font-medium transition-colors"
           >
             Annuler
@@ -149,298 +194,274 @@ export default function EditThirdPartyPage() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
+        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
           {error}
         </div>
       )}
 
+      {/* Formulaire Principal */}
       <form
         onSubmit={handleSubmit}
         className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
       >
-        {/* Informations de base */}
-        <div className="border-border border-b pb-6">
-          <h2 className="text-foreground text-base leading-7 font-semibold">
+        {/* Section : Informations de base */}
+        <section className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base font-semibold">
             Informations principales
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="name"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 Nom / Raison sociale *
               </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  required
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                value={formData.name}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
             <div>
               <label
                 htmlFor="code_client"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 Code client
               </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="code_client"
-                  name="code_client"
-                  value={formData.code_client}
-                  onChange={handleChange}
-                  placeholder="Optionnel"
-                  className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="text"
+                id="code_client"
+                name="code_client"
+                value={formData.code_client}
+                onChange={handleChange}
+                placeholder="Ex: CUST-001"
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Classification / Type */}
-        <div className="border-border border-b pb-6">
-          <h2 className="text-foreground text-base leading-7 font-semibold">
+        {/* Section : Classification */}
+        <section className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base font-semibold">
             Classification
           </h2>
           <div className="mt-4 max-w-md">
             <label
               htmlFor="t_type"
-              className="text-foreground block text-sm leading-6 font-medium"
+              className="text-foreground mb-2 block text-sm font-medium"
             >
-              Type
+              Type de tiers
             </label>
-            <div className="mt-2">
-              <select
-                id="t_type"
-                name="t_type"
-                value={formData.t_type}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2.5 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-              >
-                <option value="client">Client</option>
-                <option value="prospect">Prospect</option>
-                <option value="fournisseur">Fournisseur</option>
-              </select>
-            </div>
+            <select
+              id="t_type"
+              name="t_type"
+              value={formData.t_type}
+              onChange={handleChange}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+            >
+              <option value="client">Client</option>
+              <option value="prospect">Prospect</option>
+              <option value="fournisseur">Fournisseur</option>
+            </select>
           </div>
-        </div>
+        </section>
 
-        {/* Contact */}
-        <div className="border-border border-b pb-6">
-          <h2 className="text-foreground text-base leading-7 font-semibold">
+        {/* Section : Contact */}
+        <section className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base font-semibold">
             Coordonnées de contact
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
             <div>
               <label
                 htmlFor="email"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 Email
               </label>
-              <div className="mt-2">
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
             <div>
               <label
                 htmlFor="phone"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 Téléphone
               </label>
-              <div className="mt-2">
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="tel"
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
             <div>
               <label
                 htmlFor="url"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 Site web (URL)
               </label>
-              <div className="mt-2">
-                <input
-                  type="url"
-                  id="url"
-                  name="url"
-                  value={formData.url}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="url"
+                id="url"
+                name="url"
+                value={formData.url}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Adresse */}
-        <div className="border-border border-b pb-6">
-          <h2 className="text-foreground text-base leading-7 font-semibold">
+        {/* Section : Adresse */}
+        <section className="border-border border-b pb-6">
+          <h2 className="text-foreground text-base font-semibold">
             Adresse Postale
           </h2>
           <div className="mt-4 space-y-4">
             <div>
               <label
                 htmlFor="address"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 Rue / Voie
               </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="text"
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
-
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
               <div>
                 <label
                   htmlFor="zip"
-                  className="text-foreground block text-sm leading-6 font-medium"
+                  className="text-foreground mb-2 block text-sm font-medium"
                 >
                   Code Postal
                 </label>
-                <div className="mt-2">
-                  <input
-                    type="text"
-                    id="zip"
-                    name="zip"
-                    value={formData.zip}
-                    onChange={handleChange}
-                    className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                  />
-                </div>
+                <input
+                  type="text"
+                  id="zip"
+                  name="zip"
+                  value={formData.zip}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+                />
               </div>
               <div>
                 <label
                   htmlFor="town"
-                  className="text-foreground block text-sm leading-6 font-medium"
+                  className="text-foreground mb-2 block text-sm font-medium"
                 >
                   Ville
                 </label>
-                <div className="mt-2">
-                  <input
-                    type="text"
-                    id="town"
-                    name="town"
-                    value={formData.town}
-                    onChange={handleChange}
-                    className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                  />
-                </div>
+                <input
+                  type="text"
+                  id="town"
+                  name="town"
+                  value={formData.town}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+                />
               </div>
               <div>
                 <label
                   htmlFor="country"
-                  className="text-foreground block text-sm leading-6 font-medium"
+                  className="text-foreground mb-2 block text-sm font-medium"
                 >
                   Pays
                 </label>
-                <div className="mt-2">
-                  <input
-                    type="text"
-                    id="country"
-                    name="country"
-                    value={formData.country}
-                    onChange={handleChange}
-                    className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                  />
-                </div>
+                <input
+                  type="text"
+                  id="country"
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+                />
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Legal */}
-        <div className="pb-2">
-          <h2 className="text-foreground text-base leading-7 font-semibold">
+        {/* Section : Legal */}
+        <section className="pb-2">
+          <h2 className="text-foreground text-base font-semibold">
             Identifiants Légaux
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="tva_intra"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 Numéro de TVA
               </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="tva_intra"
-                  name="tva_intra"
-                  value={formData.tva_intra}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="text"
+                id="tva_intra"
+                name="tva_intra"
+                value={formData.tva_intra}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
             <div>
               <label
                 htmlFor="idprof2"
-                className="text-foreground block text-sm leading-6 font-medium"
+                className="text-foreground mb-2 block text-sm font-medium"
               >
                 SIRET
               </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="idprof2"
-                  name="idprof2"
-                  value={formData.idprof2}
-                  onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 sm:text-sm sm:leading-6"
-                />
-              </div>
+              <input
+                type="text"
+                id="idprof2"
+                name="idprof2"
+                value={formData.idprof2}
+                onChange={handleChange}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+              />
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Actions Submit */}
-        <div className="border-border flex items-center justify-end space-x-4 border-t pt-4">
+        {/* Footer : Actions Submit */}
+        <div className="border-border flex items-center justify-end space-x-4 border-t pt-6">
           <button
             type="button"
             onClick={() => router.back()}
             disabled={saving}
-            className="text-muted hover:text-foreground text-sm leading-6 font-medium disabled:opacity-50"
+            className="text-muted hover:text-foreground text-sm font-medium transition-colors disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="btn-primary inline-flex justify-center px-6 py-2"
+            className="btn-primary inline-flex justify-center px-6 py-2 shadow-sm"
           >
-            {saving ? 'Enregistrement en cours...' : 'Enregistrer'}
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
           </button>
         </div>
       </form>
