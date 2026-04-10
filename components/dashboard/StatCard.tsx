@@ -5,6 +5,7 @@ import Link from 'next/link';
 interface StatCardProps {
   label: string;
   value: string | number;
+  subValue?: string | number;
   icon: string | React.ReactNode;
   description?: string;
   trend?: {
@@ -18,6 +19,7 @@ interface StatCardProps {
 export default function StatCard({
   label,
   value,
+  subValue,
   icon,
   description,
   trend,
@@ -30,21 +32,26 @@ export default function StatCard({
         <div className={`rounded-lg bg-background p-2 text-2xl ${colorClassName} ring-1 ring-inset ring-gray-500/10 dark:ring-gray-400/20`}>
           {icon}
         </div>
-        {trend && (
-          <div
-            className={`flex items-center text-xs font-medium ${
-              trend.isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-            }`}
-          >
-            {trend.isPositive ? '↑' : '↓'} {trend.value}
-          </div>
-        )}
       </div>
       <div className="mt-4">
         <h3 className="text-muted text-sm font-medium tracking-wide uppercase">{label}</h3>
         <div className="mt-1 flex items-baseline justify-between">
           <p className="text-foreground text-2xl font-bold tracking-tight">
             {value}
+            {subValue && (
+              <span className="ml-2 text-[0.6em] font-medium text-red-400 dark:text-red-400/80">
+                ({subValue})
+              </span>
+            )}
+            {trend && (
+              <span
+                className={`ml-2 text-[0.6em] font-medium ${
+                  trend.isPositive ? 'text-green-500 dark:text-green-400' : 'text-red-400 dark:text-red-400/80'
+                }`}
+              >
+                ({trend.isPositive ? '↑' : '↓'} {trend.value})
+              </span>
+            )}
           </p>
         </div>
         {description && (

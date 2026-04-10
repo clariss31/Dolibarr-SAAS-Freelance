@@ -6,17 +6,24 @@ import { api } from '../../services/api';
 import { getErrorMessage } from '../../utils/error-handler';
 import { Invoice, Proposal, Product, ThirdParty } from '../../types/dolibarr';
 import StatCard from '../../components/dashboard/StatCard';
+import PeriodFilter, { Period } from '../../components/dashboard/PeriodFilter';
 
 export default function DashboardRootPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Period State
+  const [period, setPeriod] = useState<Period>({ type: 'month' });
+
   // KPI States
   const [stats, setStats] = useState({
-    caMonthHT: 0,
-    unpaidInvoicesCount: 0,
+    caHT: 0,
+    caHTPrevious: 0,
+    unpaidInvoicesHT: 0,
+    unpaidInvoicesOverdueHT: 0,
     pendingProposalsHT: 0,
     upcomingSupplierHT: 0,
+    upcomingSupplierOverdueHT: 0,
   });
 
   // Recent Activity States
@@ -39,11 +46,54 @@ export default function DashboardRootPage() {
       setError('');
       try {
         const now = new Date();
-        // Month boundary for current month's CA
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const startOfMonth = new Date(year, month, 1, 0, 0, 0);
-        const startOfMonthTs = Math.floor(startOfMonth.getTime() / 1000);
+        let startTs = 0;
+        let endTs = Math.floor(now.getTime() / 1000);
+
+        if (period.type === 'week') {
+          startTs = Math.floor(
+            new Date(now.getTime() - 7 * 24 * 3600 * 1000).getTime() / 1000
+          );
+        } else if (period.type === 'month') {
+          startTs = Math.floor(
+            new Date(now.getTime() - 30 * 24 * 3600 * 1000).getTime() / 1000
+          );
+        } else if (period.type === 'year') {
+          startTs = Math.floor(
+            new Date(now.getTime() - 365 * 24 * 3600 * 1000).getTime() / 1000
+          );
+        } else if (
+          period.type === 'custom' &&
+          period.startDate &&
+          period.endDate
+        ) {
+          startTs = Math.floor(period.startDate.getTime() / 1000);
+          endTs = Math.floor(period.endDate.getTime() / 1000) + 86399;
+        } else {
+          startTs = Math.floor(
+            new Date(now.getTime() - 30 * 24 * 3600 * 1000).getTime() / 1000
+          );
+        }
+
+        let prevStartTs = 0;
+        let prevEndTs = 0;
+
+        if (period.type === 'week') {
+          prevEndTs = startTs - 1;
+          prevStartTs = prevEndTs - 7 * 24 * 3600 + 1;
+        } else if (period.type === 'month') {
+          prevEndTs = startTs - 1;
+          prevStartTs = prevEndTs - 30 * 24 * 3600 + 1;
+        } else if (period.type === 'year') {
+          prevEndTs = startTs - 1;
+          prevStartTs = prevEndTs - 365 * 24 * 3600 + 1;
+        } else if (period.type === 'custom' && period.startDate && period.endDate) {
+          const delta = endTs - startTs + 1;
+          prevEndTs = startTs - 1;
+          prevStartTs = prevEndTs - delta + 1;
+        } else {
+          prevEndTs = startTs - 1;
+          prevStartTs = prevEndTs - 30 * 24 * 3600 + 1;
+        }
 
         // We fetch KPIs and Lists using allSettled to ensure failure of one doesn't kill the whole page
         const [
@@ -57,7 +107,7 @@ export default function DashboardRootPage() {
           clientInvoicesRes,
           supplierInvoicesRes,
         ] = await Promise.allSettled([
-          api.get('/invoices?limit=200&sortfield=t.datec&sortorder=DESC'),
+          api.get('/invoices?limit=1000&sortfield=t.datec&sortorder=DESC'),
           api.get('/proposals?limit=100&sqlfilters=(t.fk_statut:=:1)'),
           api.get('/supplierinvoices?limit=100&sqlfilters=(t.fk_statut:=:1)'),
           api.get('/thirdparties?limit=5&sortfield=t.tms&sortorder=DESC'),
@@ -70,28 +120,55 @@ export default function DashboardRootPage() {
 
         // Process results
         const newStats = {
-          caMonthHT: 0,
-          unpaidInvoicesCount: 0,
+          caHT: 0,
+          caHTPrevious: 0,
+          unpaidInvoicesHT: 0,
+          unpaidInvoicesOverdueHT: 0,
           pendingProposalsHT: 0,
           upcomingSupplierHT: 0,
+          upcomingSupplierOverdueHT: 0,
         };
+
+        const nowTs = Math.floor(Date.now() / 1000);
 
         if (
           invoicesKpiRes.status === 'fulfilled' &&
           invoicesKpiRes.value.data
         ) {
           const invs: Invoice[] = invoicesKpiRes.value.data;
-          newStats.caMonthHT = invs
+          newStats.caHT = invs
             .filter(
               (inv) =>
                 inv.date &&
-                Number(inv.date) >= startOfMonthTs &&
+                Number(inv.date) >= startTs &&
+                Number(inv.date) <= endTs &&
                 Number(inv.statut) > 0
             )
             .reduce((acc, inv) => acc + Number(inv.total_ht || 0), 0);
-          newStats.unpaidInvoicesCount = invs.filter(
-            (inv) => Number(inv.statut) === 1
-          ).length;
+
+          newStats.caHTPrevious = invs
+            .filter(
+              (inv) =>
+                inv.date &&
+                Number(inv.date) >= prevStartTs &&
+                Number(inv.date) <= prevEndTs &&
+                Number(inv.statut) > 0
+            )
+            .reduce((acc, inv) => acc + Number(inv.total_ht || 0), 0);
+
+          const unpaid = invs.filter((inv) => Number(inv.statut) === 1);
+          newStats.unpaidInvoicesHT = unpaid.reduce(
+            (a, b) => a + Number(b.total_ht || 0),
+            0
+          );
+          newStats.unpaidInvoicesOverdueHT = unpaid
+            .filter((inv) =>
+              isOverdue(
+                inv.datelimit || inv.date_lim_reglement || inv.date_echeance,
+                nowTs
+              )
+            )
+            .reduce((a, b) => a + Number(b.total_ht || 0), 0);
         }
 
         if (
@@ -110,10 +187,21 @@ export default function DashboardRootPage() {
           supplierKpiRes.value.data
         ) {
           const sInvs: Invoice[] = supplierKpiRes.value.data;
-          newStats.upcomingSupplierHT = sInvs.reduce(
+          const upcoming = sInvs.filter((inv) => Number(inv.statut) === 1);
+
+          newStats.upcomingSupplierHT = upcoming.reduce(
             (acc, inv) => acc + Number(inv.total_ht || 0),
             0
           );
+
+          newStats.upcomingSupplierOverdueHT = upcoming
+            .filter((inv) =>
+              isOverdue(
+                inv.datelimit || inv.date_lim_reglement || inv.date_echeance,
+                nowTs
+              )
+            )
+            .reduce((a, b) => a + Number(b.total_ht || 0), 0);
         }
 
         setStats(newStats);
@@ -152,13 +240,30 @@ export default function DashboardRootPage() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [period]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'EUR',
     }).format(amount);
+  };
+
+  const isOverdue = (limitStr: string | number | undefined, nowSeconds: number) => {
+    if (!limitStr) return false;
+    let parsedTs = 0;
+    if (typeof limitStr === 'string' && limitStr.includes('-')) {
+      // Handles '2026-04-01' or '2026-04-01 00:00:00'
+      const millis = new Date(limitStr).getTime();
+      if (!isNaN(millis)) {
+        parsedTs = Math.floor(millis / 1000);
+      }
+    } else {
+      parsedTs = Number(limitStr);
+      // Dolibarr returns seconds, but if it has more than 10 digits it might be ms
+      if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
+    }
+    return parsedTs > 0 && parsedTs < nowSeconds;
   };
 
   const formatDate = (timestamp: number | string | undefined) => {
@@ -269,6 +374,7 @@ export default function DashboardRootPage() {
                               item.fin_validite ||
                                 item.datelimit ||
                                 item.date_lim_reglement ||
+                                item.date_echeance ||
                                 item.date
                             )}
                           </span>
@@ -334,13 +440,16 @@ export default function DashboardRootPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-foreground text-3xl font-bold tracking-tight">
-          Tableau de bord
-        </h1>
-        <p className="text-muted mt-2 text-sm">
-          Aperçu global de votre activité freelance
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-foreground text-3xl font-bold tracking-tight">
+            Tableau de bord
+          </h1>
+          <p className="text-muted mt-2 text-sm">
+            Aperçu global de votre activité freelance
+          </p>
+        </div>
+        <PeriodFilter period={period} onChange={setPeriod} />
       </div>
 
       {error && (
@@ -352,22 +461,31 @@ export default function DashboardRootPage() {
       )}
 
       {/* KPI Section */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="CA HT (Mois)"
-          value={formatCurrency(stats.caMonthHT)}
-          icon="📈"
-          colorClassName="text-blue-600"
-          description="Chiffre d'affaires facturé ce mois"
-        />
-        <StatCard
-          label="Factures impayées"
-          value={stats.unpaidInvoicesCount}
-          icon="⏳"
-          colorClassName="text-amber-600"
-          description="Factures clients en attente de règlement"
-          href="/billing-payments"
-        />
+      {(() => {
+        let caTrend;
+        if (stats.caHTPrevious > 0) {
+          const change = ((stats.caHT - stats.caHTPrevious) / stats.caHTPrevious) * 100;
+          caTrend = {
+            value: `${Math.abs(change).toFixed(1)} %`,
+            isPositive: change >= 0,
+          };
+        } else if (stats.caHT > 0) {
+          caTrend = {
+            value: `100 %`,
+            isPositive: true,
+          };
+        }
+
+        return (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Chiffre d'affaires"
+              value={formatCurrency(stats.caHT)}
+              trend={caTrend}
+              icon="📈"
+              colorClassName="text-blue-600"
+              description="Chiffre d'affaires facturé sur la période"
+            />
         <StatCard
           label="Devis en attente"
           value={formatCurrency(stats.pendingProposalsHT)}
@@ -377,14 +495,34 @@ export default function DashboardRootPage() {
           href="/commerce"
         />
         <StatCard
-          label="Échéances fournisseurs"
+          label="Factures clients impayées"
+          value={formatCurrency(stats.unpaidInvoicesHT)}
+          subValue={
+            stats.unpaidInvoicesOverdueHT > 0
+              ? formatCurrency(stats.unpaidInvoicesOverdueHT)
+              : undefined
+          }
+          icon="⏳"
+          colorClassName="text-amber-600"
+          description="En attente de règlement client"
+          href="/billing-payments"
+        />
+        <StatCard
+          label="Factures fourniss. impayées"
           value={formatCurrency(stats.upcomingSupplierHT)}
+          subValue={
+            stats.upcomingSupplierOverdueHT > 0
+              ? formatCurrency(stats.upcomingSupplierOverdueHT)
+              : undefined
+          }
           icon="💳"
           colorClassName="text-red-600"
-          description="Montant total à régler aux fournisseurs"
+          description="Paiements fournisseurs non réglés"
           href="/billing-payments"
         />
       </div>
+      );
+    })()}
 
       {/* Recent Activity Section */}
       <div className="space-y-6">

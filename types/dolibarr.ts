@@ -88,6 +88,8 @@ export interface Invoice {
   nom?: string;
   date?: number | string;
   datelimit?: number | string;
+  date_lim_reglement?: number | string;
+  date_echeance?: number | string;
   total_ht: number | string;
   total_tva?: number | string;
   total_ttc: number | string;

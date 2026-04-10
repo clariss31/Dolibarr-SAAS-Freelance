@@ -362,7 +362,7 @@ export default function BillingPaymentsPage() {
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
                       {formatDate(
-                        invoice.datelimit || (invoice as any).date_lim_reglement
+                        invoice.datelimit || invoice.date_lim_reglement || invoice.date_echeance
                       )}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
