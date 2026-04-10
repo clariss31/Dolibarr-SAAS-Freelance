@@ -64,6 +64,23 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
     return new Intl.DateTimeFormat('fr-FR').format(new Date(ms));
   };
 
+  /** Vérifie si une facture est en retard (date d'échéance dépassée et impayée) */
+  const checkOverdue = (inv: Invoice) => {
+    if (Number(inv.statut) !== 1) return false;
+    const limitStr = inv.datelimit || inv.date_lim_reglement || inv.date_echeance;
+    if (!limitStr) return false;
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    let parsedTs = 0;
+    if (typeof limitStr === 'string' && limitStr.includes('-')) {
+      const millis = new Date(limitStr).getTime();
+      if (!isNaN(millis)) parsedTs = Math.floor(millis / 1000);
+    } else {
+      parsedTs = Number(limitStr);
+      if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
+    }
+    return parsedTs > 0 && parsedTs < nowSeconds;
+  };
+
   const getStatusBadge = (invoice: Invoice) => {
     const status = Number(invoice.statut);
     switch (status) {
@@ -186,9 +203,16 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
               <p className="text-muted text-xs font-medium tracking-wider uppercase">
                 Date d'échéance
               </p>
-              <p className="text-foreground mt-1 text-sm font-medium">
-                {formatDate(invoice.datelimit)}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className={`text-sm font-medium ${checkOverdue(invoice) ? 'text-red-600 dark:text-red-400 font-bold' : 'text-foreground'}`}>
+                  {formatDate(invoice.datelimit || invoice.date_lim_reglement || invoice.date_echeance)}
+                </p>
+                {checkOverdue(invoice) && (
+                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                    RETARD
+                  </span>
+                )}
+              </div>
             </div>
             <div>
               <p className="text-muted text-xs font-medium tracking-wider uppercase">
@@ -277,7 +301,7 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
                   const lineId = line.id ?? line.rowid ?? `line-${idx}`;
                   const description = line.label || line.description || line.product_label || '-';
                   const tva = Number(line.tva_tx) || 0;
-                  const puHt = Number(line.subprice || line.up) || 0;
+                  const puHt = Number(line.subprice) || 0;
                   const qte = Number(line.qty) || 1;
                   const lineTotalHt = Number(line.total_ht) || (puHt * qte);
 

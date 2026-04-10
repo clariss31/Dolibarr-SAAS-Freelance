@@ -62,7 +62,7 @@ export const api = {
             throw error;
         }
 
-        return { data, status: response.status };
+        return { data, status: response.status, headers: response.headers };
     },
 
     get(endpoint: string, options?: Omit<RequestOptions, 'method'>) {

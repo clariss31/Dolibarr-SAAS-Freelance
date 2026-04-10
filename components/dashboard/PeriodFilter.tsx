@@ -87,9 +87,9 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
           onChange={handleTypeChange}
           className="bg-background border-input text-foreground focus:ring-primary focus:border-primary rounded-md border px-3 py-2 text-sm"
         >
-          <option value="week">Dernière semaine (7 jours)</option>
-          <option value="month">Dernier mois (30 jours)</option>
-          <option value="year">Dernière année (365 jours)</option>
+          <option value="week">Dernière semaine</option>
+          <option value="month">Dernier mois</option>
+          <option value="year">Dernière année</option>
           <option value="custom">Date personnalisée</option>
         </select>
       </div>

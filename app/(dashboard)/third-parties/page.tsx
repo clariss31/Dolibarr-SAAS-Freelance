@@ -16,6 +16,7 @@ export default function ThirdPartiesPage() {
   const [page, setPage] = useState(0);
   const limit = 10;
   const [hasMore, setHasMore] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,9 +56,18 @@ export default function ThirdPartiesPage() {
       if (response.data && Array.isArray(response.data)) {
         setTiers(response.data);
         setHasMore(response.data.length === limit);
+        
+        // Count from headers
+        const total = response.headers?.get('X-Total-Count');
+        if (total) {
+          setTotalItems(parseInt(total, 10));
+        } else {
+          setTotalItems(response.data.length + (response.data.length === limit ? limit : 0));
+        }
       } else {
         setTiers([]);
         setHasMore(false);
+        setTotalItems(0);
       }
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
@@ -266,6 +276,12 @@ export default function ThirdPartiesPage() {
               <p className="text-muted text-sm">
                 Affichage de la page{' '}
                 <span className="font-medium">{page + 1}</span>
+                {totalItems > 0 && (
+                  <>
+                    {' '}
+                    / <span className="font-medium">{Math.ceil(totalItems / limit)}</span>
+                  </>
+                )}
               </p>
             </div>
             <div>

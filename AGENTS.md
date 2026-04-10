@@ -45,7 +45,7 @@ Respecter scrupuleusement l'architecture suivante :
 
 - **TypeScript Strict** : Aucun type `any` n'est toléré. Les interfaces de données et API doivent obligatoirement être déclarées en amont dans le dossier `/types`.
 - **Naming** : Fonctions et composants nommés de manière explicite et rigoureuse.
-- **Commentaires** : Commenter le code uniquement lorsque la logique métier est complexe.
+- **Commentaires** : Commentaires en français.
 - **Justification** : Chaque nouvelle librairie ajoutée devra être justifiée.
 - **Dépendances** : S'assurer régulièrement que les dépendances sont à jour.
 - **Gitignore** : Vérifier à chaque étape que le `.gitignore` est à jour afin de ne publier aucun fichier inutile ni aucune information sensible.

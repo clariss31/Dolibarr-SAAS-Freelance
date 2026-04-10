@@ -86,7 +86,11 @@ export default function DashboardRootPage() {
         } else if (period.type === 'year') {
           prevEndTs = startTs - 1;
           prevStartTs = prevEndTs - 365 * 24 * 3600 + 1;
-        } else if (period.type === 'custom' && period.startDate && period.endDate) {
+        } else if (
+          period.type === 'custom' &&
+          period.startDate &&
+          period.endDate
+        ) {
           const delta = endTs - startTs + 1;
           prevEndTs = startTs - 1;
           prevStartTs = prevEndTs - delta + 1;
@@ -249,7 +253,10 @@ export default function DashboardRootPage() {
     }).format(amount);
   };
 
-  const isOverdue = (limitStr: string | number | undefined, nowSeconds: number) => {
+  const isOverdue = (
+    limitStr: string | number | undefined,
+    nowSeconds: number
+  ) => {
     if (!limitStr) return false;
     let parsedTs = 0;
     if (typeof limitStr === 'string' && limitStr.includes('-')) {
@@ -464,7 +471,8 @@ export default function DashboardRootPage() {
       {(() => {
         let caTrend;
         if (stats.caHTPrevious > 0) {
-          const change = ((stats.caHT - stats.caHTPrevious) / stats.caHTPrevious) * 100;
+          const change =
+            ((stats.caHT - stats.caHTPrevious) / stats.caHTPrevious) * 100;
           caTrend = {
             value: `${Math.abs(change).toFixed(1)} %`,
             isPositive: change >= 0,
@@ -486,43 +494,43 @@ export default function DashboardRootPage() {
               colorClassName="text-blue-600"
               description="Chiffre d'affaires facturé sur la période"
             />
-        <StatCard
-          label="Devis en attente"
-          value={formatCurrency(stats.pendingProposalsHT)}
-          icon="📄"
-          colorClassName="text-purple-600"
-          description="Total des propositions ouvertes"
-          href="/commerce"
-        />
-        <StatCard
-          label="Factures clients impayées"
-          value={formatCurrency(stats.unpaidInvoicesHT)}
-          subValue={
-            stats.unpaidInvoicesOverdueHT > 0
-              ? formatCurrency(stats.unpaidInvoicesOverdueHT)
-              : undefined
-          }
-          icon="⏳"
-          colorClassName="text-amber-600"
-          description="En attente de règlement client"
-          href="/billing-payments"
-        />
-        <StatCard
-          label="Factures fourniss. impayées"
-          value={formatCurrency(stats.upcomingSupplierHT)}
-          subValue={
-            stats.upcomingSupplierOverdueHT > 0
-              ? formatCurrency(stats.upcomingSupplierOverdueHT)
-              : undefined
-          }
-          icon="💳"
-          colorClassName="text-red-600"
-          description="Paiements fournisseurs non réglés"
-          href="/billing-payments"
-        />
-      </div>
-      );
-    })()}
+            <StatCard
+              label="Devis en attente"
+              value={formatCurrency(stats.pendingProposalsHT)}
+              icon="📄"
+              colorClassName="text-purple-600"
+              description="Total des propositions ouvertes"
+              href="/commerce"
+            />
+            <StatCard
+              label="Factures clients impayées"
+              value={formatCurrency(stats.unpaidInvoicesHT)}
+              subValue={
+                stats.unpaidInvoicesOverdueHT > 0
+                  ? formatCurrency(stats.unpaidInvoicesOverdueHT)
+                  : undefined
+              }
+              icon="⏳"
+              colorClassName="text-amber-600"
+              description="En attente de règlement client"
+              href="/billing-payments"
+            />
+            <StatCard
+              label="Factures fourniss. impayées"
+              value={formatCurrency(stats.upcomingSupplierHT)}
+              subValue={
+                stats.upcomingSupplierOverdueHT > 0
+                  ? formatCurrency(stats.upcomingSupplierOverdueHT)
+                  : undefined
+              }
+              icon="💳"
+              colorClassName="text-red-600"
+              description="Paiements fournisseurs non réglés"
+              href="/billing-payments"
+            />
+          </div>
+        );
+      })()}
 
       {/* Recent Activity Section */}
       <div className="space-y-6">

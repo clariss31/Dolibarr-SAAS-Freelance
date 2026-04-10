@@ -19,6 +19,7 @@ export default function CommercePage() {
   // Pagination
   const [page, setPage] = useState(1);
   const limit = 20;
+  const [totalItems, setTotalItems] = useState(0);
 
   // Filtres
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,8 +78,17 @@ export default function CommercePage() {
       const response = await api.get(query);
       if (response.data) {
         setProposals(response.data);
+        
+        // Count from headers
+        const total = response.headers?.get('X-Total-Count');
+        if (total) {
+          setTotalItems(parseInt(total, 10));
+        } else {
+          setTotalItems(response.data.length + (response.data.length === limit ? limit : 0));
+        }
       } else {
         setProposals([]);
+        setTotalItems(0);
       }
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
@@ -334,21 +344,35 @@ export default function CommercePage() {
         {/* Pagination */}
         {!loading && (proposals.length >= limit || page > 1) && (
           <div className="border-border bg-surface flex items-center justify-between border-t px-4 py-3 sm:px-6">
-            <div className="flex flex-1 justify-between sm:justify-end">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="text-foreground ring-border hover:bg-muted/10 relative inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset focus-visible:outline-offset-0 disabled:opacity-50"
-              >
-                Précédent
-              </button>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={proposals.length < limit}
-                className="text-foreground ring-border hover:bg-muted/10 relative ml-3 inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset focus-visible:outline-offset-0 disabled:opacity-50"
-              >
-                Suivant
-              </button>
+            <div className="flex flex-1 items-center justify-between">
+              <div>
+                <p className="text-muted text-sm">
+                  Affichage de la page{' '}
+                  <span className="font-medium">{page}</span>
+                  {totalItems > 0 && (
+                    <>
+                      {' '}
+                      / <span className="font-medium">{Math.ceil(totalItems / limit)}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="text-foreground ring-border hover:bg-muted/10 relative inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset focus-visible:outline-offset-0 disabled:opacity-50"
+                >
+                  Précédent
+                </button>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={proposals.length < limit}
+                  className="text-foreground ring-border hover:bg-muted/10 relative ml-3 inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold ring-1 ring-inset focus-visible:outline-offset-0 disabled:opacity-50"
+                >
+                  Suivant
+                </button>
+              </div>
             </div>
           </div>
         )}

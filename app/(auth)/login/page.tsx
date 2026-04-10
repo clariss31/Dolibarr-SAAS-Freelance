@@ -1,11 +1,10 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
 import { auth } from '../../../utils/auth';
 import { getErrorMessage } from '../../../utils/error-handler';
-import { ApiError } from '../../../types/dolibarr';
 
 export default function LoginPage() {
   const [login, setLogin] = useState('');
@@ -30,10 +29,14 @@ export default function LoginPage() {
     try {
       // S'assurer que l'URL est dans le cookie pour le service API
       auth.setAuth('', apiUrl);
-      
+
       const response = await api.post('/login', { login, password });
-      
-      if (response.data && response.data.success && response.data.success.token) {
+
+      if (
+        response.data &&
+        response.data.success &&
+        response.data.success.token
+      ) {
         auth.setAuth(response.data.success.token, apiUrl);
         router.push('/');
       } else {
@@ -47,28 +50,33 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-xl bg-surface p-8 shadow-lg">
+    <main className="bg-background flex min-h-screen items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+      <div className="bg-surface w-full max-w-md space-y-8 rounded-xl p-8 shadow-lg">
         <div>
-          <h1 className="mt-6 text-center text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="text-foreground mt-6 text-center text-3xl font-bold tracking-tight">
             Connexion à DoliFree
           </h1>
-          <p className="mt-2 text-center text-sm text-muted">
+          <p className="text-muted mt-2 text-center text-sm">
             Votre interface simplifiée pour Dolibarr
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="rounded-md bg-red-50 dark:bg-red-900/30 p-4" role="alert">
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
+            <div
+              className="rounded-md bg-red-50 p-4 dark:bg-red-900/30"
+              role="alert"
+            >
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                {error}
+              </p>
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div>
-              <label 
-                htmlFor="login" 
-                className="block text-sm font-medium leading-6 text-foreground"
+              <label
+                htmlFor="login"
+                className="text-foreground block text-sm leading-6 font-medium"
               >
                 Identifiant
               </label>
@@ -79,7 +87,7 @@ export default function LoginPage() {
                   type="text"
                   required
                   autoComplete="username"
-                  className="block w-full rounded-md bg-background py-1.5 px-3 text-foreground ring-1 ring-inset ring-border placeholder:text-muted focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
+                  className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md px-3 py-1.5 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
                   placeholder="Votre identifiant"
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
@@ -89,9 +97,9 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label 
-                htmlFor="password" 
-                className="block text-sm font-medium leading-6 text-foreground"
+              <label
+                htmlFor="password"
+                className="text-foreground block text-sm leading-6 font-medium"
               >
                 Mot de passe
               </label>
@@ -102,7 +110,7 @@ export default function LoginPage() {
                   type="password"
                   required
                   autoComplete="current-password"
-                  className="block w-full rounded-md bg-background py-1.5 px-3 text-foreground ring-1 ring-inset ring-border placeholder:text-muted focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
+                  className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md px-3 py-1.5 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
                   placeholder="Votre mot de passe"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

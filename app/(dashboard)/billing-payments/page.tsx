@@ -25,6 +25,7 @@ export default function BillingPaymentsPage() {
   const [page, setPage] = useState(0);
   const limit = 10;
   const [hasMore, setHasMore] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Filtres
   const [searchTerm, setSearchTerm] = useState('');
@@ -87,9 +88,19 @@ export default function BillingPaymentsPage() {
       if (response.data && Array.isArray(response.data)) {
         setInvoices(response.data);
         setHasMore(response.data.length === limit);
+
+        // Get total count from headers
+        const total = response.headers?.get('X-Total-Count');
+        if (total) {
+          setTotalItems(parseInt(total, 10));
+        } else {
+          // Fallback if header missing but we have items
+          setTotalItems(response.data.length + (response.data.length === limit ? limit : 0));
+        }
       } else {
         setInvoices([]);
         setHasMore(false);
+        setTotalItems(0);
       }
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
@@ -140,6 +151,29 @@ export default function BillingPaymentsPage() {
     // Dolibarr renvoie souvent le timestamp en secondes
     const ms = numTs < 10000000000 ? numTs * 1000 : numTs;
     return new Intl.DateTimeFormat('fr-FR').format(new Date(ms));
+  };
+
+  /** Vérifie si une facture est en retard (date d'échéance dépassée et impayée) */
+  const checkOverdue = (invoice: Invoice) => {
+    if (Number(invoice.statut) !== 1) return false; // Uniquement pour les factures impayées/validées
+
+    const limitStr = invoice.datelimit || invoice.date_lim_reglement || invoice.date_echeance;
+    if (!limitStr) return false;
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    let parsedTs = 0;
+
+    if (typeof limitStr === 'string' && limitStr.includes('-')) {
+      const millis = new Date(limitStr).getTime();
+      if (!isNaN(millis)) {
+        parsedTs = Math.floor(millis / 1000);
+      }
+    } else {
+      parsedTs = Number(limitStr);
+      if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
+    }
+
+    return parsedTs > 0 && parsedTs < nowSeconds;
   };
 
   // Badge pour l'état avec couleurs accessibles
@@ -360,9 +394,22 @@ export default function BillingPaymentsPage() {
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
                       {formatDate(invoice.date)}
                     </td>
-                    <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
+                    <td
+                      className={`px-3 py-4 text-sm whitespace-nowrap ${
+                        checkOverdue(invoice)
+                          ? 'text-red-600 font-semibold dark:text-red-400'
+                          : 'text-muted'
+                      }`}
+                    >
                       {formatDate(
-                        invoice.datelimit || invoice.date_lim_reglement || invoice.date_echeance
+                        invoice.datelimit ||
+                          invoice.date_lim_reglement ||
+                          invoice.date_echeance
+                      )}
+                      {checkOverdue(invoice) && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                          RETARD
+                        </span>
                       )}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
@@ -395,6 +442,12 @@ export default function BillingPaymentsPage() {
               <p className="text-muted text-sm">
                 Affichage de la page{' '}
                 <span className="font-medium">{page + 1}</span>
+                {totalItems > 0 && (
+                  <>
+                    {' '}
+                    / <span className="font-medium">{Math.ceil(totalItems / limit)}</span>
+                  </>
+                )}
               </p>
             </div>
             <div>

@@ -16,6 +16,7 @@ export default function ProductsServicesPage() {
   const [page, setPage] = useState(0);
   const limit = 10;
   const [hasMore, setHasMore] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,9 +53,18 @@ export default function ProductsServicesPage() {
       if (response.data && Array.isArray(response.data)) {
         setProducts(response.data);
         setHasMore(response.data.length === limit);
+        
+        // Count from headers
+        const total = response.headers?.get('X-Total-Count');
+        if (total) {
+          setTotalItems(parseInt(total, 10));
+        } else {
+          setTotalItems(response.data.length + (response.data.length === limit ? limit : 0));
+        }
       } else {
         setProducts([]);
         setHasMore(false);
+        setTotalItems(0);
       }
     } catch (err: unknown) {
       const apiErr = err as Error & ApiError;
@@ -292,6 +302,12 @@ export default function ProductsServicesPage() {
               <p className="text-muted text-sm">
                 Affichage de la page{' '}
                 <span className="font-medium">{page + 1}</span>
+                {totalItems > 0 && (
+                  <>
+                    {' '}
+                    / <span className="font-medium">{Math.ceil(totalItems / limit)}</span>
+                  </>
+                )}
               </p>
             </div>
             <div>
