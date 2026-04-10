@@ -279,6 +279,7 @@ export default function CommerceDetailsPage() {
                         <th scope="col" className="text-foreground px-4 py-3 text-left font-medium">Désignation</th>
                         <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Prix unit. HT</th>
                         <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">TVA %</th>
+                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Remise %</th>
                         <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Qté</th>
                         <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Sous-total HT</th>
                       </tr>
@@ -286,7 +287,7 @@ export default function CommerceDetailsPage() {
                     <tbody className="divide-border divide-y">
                       {proposal.lines.map((line: ProposalLine, i: number) => {
                         const label = line.product_label || line.label || line.description || `Ligne ${i + 1}`;
-                        const unitPrice = Number(line.subprice ?? line.up ?? 0);
+                        const unitPrice = Number(line.subprice ?? 0);
                         const qty = Number(line.qty);
                         const tva = Number(line.tva_tx);
                         const totalHt = Number(line.total_ht) || parseFloat((qty * unitPrice).toFixed(2));
@@ -295,6 +296,7 @@ export default function CommerceDetailsPage() {
                             <td className="text-foreground px-4 py-3">{label}</td>
                             <td className="text-foreground px-4 py-3 text-right">{formatPrice(unitPrice)}</td>
                             <td className="text-muted px-4 py-3 text-right">{tva} %</td>
+                            <td className="text-muted px-4 py-3 text-right">{Number(line.remise_percent || 0)} %</td>
                             <td className="text-foreground px-4 py-3 text-right">{qty}</td>
                             <td className="text-foreground px-4 py-3 text-right font-medium">{formatPrice(totalHt)}</td>
                           </tr>

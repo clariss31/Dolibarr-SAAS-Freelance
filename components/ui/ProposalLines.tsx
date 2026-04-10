@@ -9,16 +9,17 @@ import { Product } from '../../types/dolibarr';
  * L'identifiant temporaire `_key` permet de gérer l'état React (pas envoyé à l'API).
  */
 export interface LocalLine {
-  _key: string;         // Clé unique locale (uuid-like)
-  id?: string;          // ID Dolibarr si ligne existante
-  fk_product?: string;  // ID du produit sélectionné
+  _key: string; // Clé unique locale (uuid-like)
+  id?: string; // ID Dolibarr si ligne existante
+  fk_product?: string; // ID du produit sélectionné
   product_type: number; // 0=produit physique, 1=service
   label: string;
   qty: number;
-  subprice: number;     // Prix unitaire HT
-  tva_tx: number;       // Taux de TVA (%)
-  total_ht: number;     // Calculé : qty × subprice
-  total_ttc: number;    // Calculé : total_ht × (1 + tva_tx / 100)
+  subprice: number; // Prix unitaire HT
+  tva_tx: number; // Taux de TVA (%)
+  remise_percent: number; // Remise en pourcentage
+  total_ht: number; // Calculé : qty × subprice * (1 - remise_percent/100)
+  total_ttc: number; // Calculé : total_ht × (1 + tva_tx / 100)
 }
 
 interface ProposalLinesProps {
@@ -30,14 +31,22 @@ interface ProposalLinesProps {
 /** Calcule les totaux globaux d'un ensemble de lignes */
 function computeTotals(lines: LocalLine[]) {
   const totalHT = lines.reduce((sum, l) => sum + l.total_ht, 0);
-  const totalTVA = lines.reduce((sum, l) => sum + (l.total_ttc - l.total_ht), 0);
+  const totalTVA = lines.reduce(
+    (sum, l) => sum + (l.total_ttc - l.total_ht),
+    0
+  );
   const totalTTC = lines.reduce((sum, l) => sum + l.total_ttc, 0);
   return { totalHT, totalTVA, totalTTC };
 }
 
 /** Formate un nombre en euros avec 2 décimales */
 function formatEur(value: number): string {
-  return value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  return (
+    value.toLocaleString('fr-FR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) + ' €'
+  );
 }
 
 /** Génère une clé locale unique */
@@ -45,7 +54,11 @@ function newKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export default function ProposalLines({ lines, onChange, disabled = false }: ProposalLinesProps) {
+export default function ProposalLines({
+  lines,
+  onChange,
+  disabled = false,
+}: ProposalLinesProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
 
@@ -59,7 +72,9 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await api.get('/products?sortfield=t.label&sortorder=ASC&limit=500&mode=1');
+        const response = await api.get(
+          '/products?sortfield=t.label&sortorder=ASC&limit=500&mode=1'
+        );
         if (response.data && Array.isArray(response.data)) {
           setProducts(response.data as Product[]);
         }
@@ -81,7 +96,11 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
     const qty = selectedQty > 0 ? selectedQty : 1;
     const subprice = Number(product.price) || 0;
     const tva_tx = Number(product.tva_tx) || 0;
-    const total_ht = parseFloat((qty * subprice).toFixed(2));
+    const remise_percent = 0;
+    const base_ht = qty * subprice;
+    const total_ht = parseFloat(
+      (base_ht * (1 - remise_percent / 100)).toFixed(2)
+    );
     const total_ttc = parseFloat((total_ht * (1 + tva_tx / 100)).toFixed(2));
 
     const newLine: LocalLine = {
@@ -92,6 +111,7 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
       qty,
       subprice,
       tva_tx,
+      remise_percent,
       total_ht,
       total_ttc,
     };
@@ -103,12 +123,26 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
 
   /** Met à jour la quantité d'une ligne existante */
   const handleQtyChange = (key: string, qty: number) => {
+    handleLinePropertyChange(key, 'qty', qty > 0 ? qty : 1);
+  };
+
+  /** Helper générique pour recalculer les totaux lors d'un changement de TVA, Remise, ou QTÉ */
+  const handleLinePropertyChange = (
+    key: string,
+    prop: keyof LocalLine,
+    value: number
+  ) => {
     const updated = lines.map((l) => {
       if (l._key !== key) return l;
-      const newQty = qty > 0 ? qty : 1;
-      const total_ht = parseFloat((newQty * l.subprice).toFixed(2));
-      const total_ttc = parseFloat((total_ht * (1 + l.tva_tx / 100)).toFixed(2));
-      return { ...l, qty: newQty, total_ht, total_ttc };
+      const updatedLine = { ...l, [prop]: value };
+      const base_ht = updatedLine.qty * updatedLine.subprice;
+      const total_ht = parseFloat(
+        (base_ht * (1 - updatedLine.remise_percent / 100)).toFixed(2)
+      );
+      const total_ttc = parseFloat(
+        (total_ht * (1 + updatedLine.tva_tx / 100)).toFixed(2)
+      );
+      return { ...updatedLine, total_ht, total_ttc };
     });
     onChange(updated);
   };
@@ -148,7 +182,9 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
               className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset disabled:opacity-50"
             >
               <option value="">
-                {loadingProducts ? 'Chargement...' : '-- Sélectionnez un produit --'}
+                {loadingProducts
+                  ? 'Chargement...'
+                  : '-- Sélectionnez un produit --'}
               </option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -195,20 +231,41 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
           <table className="ring-border w-full text-sm ring-1">
             <thead className="bg-surface">
               <tr>
-                <th scope="col" className="text-foreground px-4 py-3 text-left font-medium">
+                <th
+                  scope="col"
+                  className="text-foreground px-4 py-3 text-left font-medium"
+                >
                   Désignation
                 </th>
-                <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">
+                <th
+                  scope="col"
+                  className="text-foreground px-4 py-3 text-right font-medium"
+                >
                   Prix unit. HT
                 </th>
-                <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">
+                <th
+                  scope="col"
+                  className="text-foreground px-4 py-3 text-right font-medium"
+                >
                   TVA %
                 </th>
-                <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">
+                <th
+                  scope="col"
+                  className="text-foreground px-4 py-3 text-right font-medium"
+                >
+                  Remise %
+                </th>
+                <th
+                  scope="col"
+                  className="text-foreground px-4 py-3 text-right font-medium"
+                >
                   Qté
                 </th>
-                <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">
-                  Sous-total HT
+                <th
+                  scope="col"
+                  className="text-foreground px-4 py-3 text-right font-medium"
+                >
+                  Total HT
                 </th>
                 {!disabled && (
                   <th scope="col" className="px-4 py-3">
@@ -219,12 +276,64 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
             </thead>
             <tbody className="divide-border divide-y">
               {lines.map((line) => (
-                <tr key={line._key} className="hover:bg-surface/50 transition-colors">
+                <tr
+                  key={line._key}
+                  className="hover:bg-surface/50 transition-colors"
+                >
                   <td className="text-foreground px-4 py-3">{line.label}</td>
                   <td className="text-foreground px-4 py-3 text-right">
                     {formatEur(line.subprice)}
                   </td>
-                  <td className="text-muted px-4 py-3 text-right">{line.tva_tx} %</td>
+                  <td className="text-muted px-4 py-3 text-right">
+                    {disabled ? (
+                      <span className="text-foreground">{line.tva_tx} %</span>
+                    ) : (
+                      <select
+                        value={line.tva_tx}
+                        onChange={(e) =>
+                          handleLinePropertyChange(
+                            line._key,
+                            'tva_tx',
+                            Number(e.target.value)
+                          )
+                        }
+                        className="bg-background text-foreground ring-border focus:ring-primary w-24 rounded-md px-2 py-1 text-right text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+                      >
+                        <option value="0">0 %</option>
+                        <option value="2.1">2.1 %</option>
+                        <option value="5.5">5.5 %</option>
+                        <option value="10">10 %</option>
+                        <option value="20">20 %</option>
+                      </select>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {disabled ? (
+                      <span className="text-foreground">
+                        {line.remise_percent || 0} %
+                      </span>
+                    ) : (
+                      <div className="flex items-center justify-end">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={line.remise_percent || 0}
+                          onChange={(e) =>
+                            handleLinePropertyChange(
+                              line._key,
+                              'remise_percent',
+                              Number(e.target.value)
+                            )
+                          }
+                          aria-label={`Remise pour ${line.label}`}
+                          className="bg-background text-foreground ring-border focus:ring-primary w-24 rounded-md px-2 py-1 text-right text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+                        />
+                        <span className="text-muted ml-1 text-xs">%</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {disabled ? (
                       <span className="text-foreground">{line.qty}</span>
@@ -234,9 +343,11 @@ export default function ProposalLines({ lines, onChange, disabled = false }: Pro
                         min={1}
                         step={1}
                         value={line.qty}
-                        onChange={(e) => handleQtyChange(line._key, Number(e.target.value))}
+                        onChange={(e) =>
+                          handleQtyChange(line._key, Number(e.target.value))
+                        }
                         aria-label={`Quantité pour ${line.label}`}
-                        className="bg-background text-foreground ring-border focus:ring-primary w-20 rounded-md px-2 py-1 text-right text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+                        className="bg-background text-foreground ring-border focus:ring-primary w-16 rounded-md px-2 py-1 text-right text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
                       />
                     )}
                   </td>

@@ -85,6 +85,7 @@ export default function CreateCommercePage() {
         qty: Number(line.qty),
         subprice: Number(line.subprice),
         tva_tx: Number(line.tva_tx),
+        remise_percent: Number(line.remise_percent) || 0,
       })),
     };
 
@@ -99,7 +100,7 @@ export default function CreateCommercePage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-6">
       {/* En-tête */}
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>

@@ -29,9 +29,11 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
   const unitPrice = Number(line.subprice ?? 0);
   const qty = Number(line.qty) || 1;
   const tva = Number(line.tva_tx) || 0;
+  const remise = Number(line.remise_percent) || 0;
   // Recalcul local si les totaux fournis par l'API sont à 0
+  const base_ht = qty * unitPrice;
   const totalHt =
-    Number(line.total_ht) || parseFloat((qty * unitPrice).toFixed(2));
+    Number(line.total_ht) || parseFloat((base_ht * (1 - remise / 100)).toFixed(2));
   const totalTtc =
     Number(line.total_ttc) ||
     parseFloat((totalHt * (1 + tva / 100)).toFixed(2));
@@ -45,6 +47,7 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
     qty,
     subprice: unitPrice,
     tva_tx: tva,
+    remise_percent: remise,
     total_ht: totalHt,
     total_ttc: totalTtc,
   };
@@ -188,7 +191,6 @@ export default function EditCommercePage() {
         }
 
         // B. Ajout de chaque ligne une par une
-        // On utilise /line (singulier) pour éviter les problèmes de structure de tableau imbriqué
         for (const line of lines) {
           await api.post(`/proposals/${id}/line`, {
             fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
@@ -197,6 +199,7 @@ export default function EditCommercePage() {
             qty: Number(line.qty),
             subprice: Number(line.subprice),
             tva_tx: Number(line.tva_tx),
+            remise_percent: Number(line.remise_percent) || 0,
           });
         }
       }
@@ -240,7 +243,7 @@ export default function EditCommercePage() {
   const isDraft = formData.statut === '0';
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-6">
       {/* En-tête de la page d'édition */}
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>

@@ -56,8 +56,8 @@ export interface ProposalLine {
   description?: string;
   qty: number | string;
   subprice: number | string;
-  up?: number | string;
   tva_tx: number | string;
+  remise_percent?: number | string;
   total_ht: number | string;
   total_ttc: number | string;
 }

@@ -22,7 +22,10 @@ export default function EditProductPage() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
   const [stockQty, setStockQty] = useState<number | ''>('');
   const [adjustingStock, setAdjustingStock] = useState(false);
-  const [stockMessage, setStockMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+  const [stockMessage, setStockMessage] = useState<{
+    type: 'error' | 'success';
+    text: string;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     ref: '',
@@ -40,7 +43,7 @@ export default function EditProductPage() {
       try {
         const [prodRes, wareRes] = await Promise.all([
           api.get(`/products/${id}`),
-          api.get(`/warehouses?limit=100`).catch(() => ({ data: [] }))
+          api.get(`/warehouses?limit=100`).catch(() => ({ data: [] })),
         ]);
 
         if (prodRes.data) {
@@ -85,35 +88,49 @@ export default function EditProductPage() {
 
   const handleAdjustStock = async () => {
     if (!stockQty || stockQty === 0 || !selectedWarehouse) return;
-    
+
     setAdjustingStock(true);
     setStockMessage(null);
     try {
       await api.post('/stockmovements', {
         product_id: parseInt(id),
         warehouse_id: parseInt(selectedWarehouse),
-        qty: Number(stockQty)
+        qty: Number(stockQty),
       });
-      
+
       const qtyNum = Number(stockQty);
-      
+
       // Update local object optimistically
-      setProductData(prev => prev ? {
-        ...prev,
-        stock_reel: String(Number(prev.stock_reel || 0) + qtyNum),
-        stock_theorique: String(Number(prev.stock_theorique || 0) + qtyNum)
-      } : prev);
-      
-      setStockMessage({ type: 'success', text: 'Stock mis à jour avec succès.' });
+      setProductData((prev) =>
+        prev
+          ? {
+              ...prev,
+              stock_reel: String(Number(prev.stock_reel || 0) + qtyNum),
+              stock_theorique: String(
+                Number(prev.stock_theorique || 0) + qtyNum
+              ),
+            }
+          : prev
+      );
+
+      setStockMessage({
+        type: 'success',
+        text: 'Stock mis à jour avec succès.',
+      });
       setStockQty('');
-      
+
       // Refetch background
-      api.get(`/products/${id}?_t=${Date.now()}`).then(response => {
-        if (response.data) setProductData(response.data);
-      }).catch(console.error);
-      
+      api
+        .get(`/products/${id}?_t=${Date.now()}`)
+        .then((response) => {
+          if (response.data) setProductData(response.data);
+        })
+        .catch(console.error);
     } catch (err: unknown) {
-      setStockMessage({ type: 'error', text: getErrorMessage(err) || 'Erreur lors de la mise à jour.' });
+      setStockMessage({
+        type: 'error',
+        text: getErrorMessage(err) || 'Erreur lors de la mise à jour.',
+      });
     } finally {
       setAdjustingStock(false);
     }
@@ -189,7 +206,7 @@ export default function EditProductPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-6">
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
@@ -327,7 +344,7 @@ export default function EditProductPage() {
                 htmlFor="tva_tx"
                 className="text-foreground block text-sm leading-6 font-medium"
               >
-                Taux TVA
+                TVA
               </label>
               <div className="relative mt-2 rounded-md shadow-sm">
                 <input
@@ -433,32 +450,47 @@ export default function EditProductPage() {
 
       {/* Stock Adjustment Section (Only for Products) */}
       {formData.type === '0' && productData && (
-        <div className="border-border bg-surface rounded-xl border shadow-sm p-6 mb-8 mt-8">
-          <h2 className="text-foreground text-lg font-bold tracking-tight mb-1">Ajuster le stock physique</h2>
-          <p className="text-muted text-sm mb-5">
-            Stock physique actuel : <span className="font-bold text-foreground mx-1">{productData.stock_reel || '0'}</span> 
+        <div className="border-border bg-surface mt-8 mb-8 rounded-xl border p-6 shadow-sm">
+          <h2 className="text-foreground mb-1 text-lg font-bold tracking-tight">
+            Ajuster le stock physique
+          </h2>
+          <p className="text-muted mb-5 text-sm">
+            Stock physique actuel :{' '}
+            <span className="text-foreground mx-1 font-bold">
+              {productData.stock_reel || '0'}
+            </span>
             (Virtuel: {productData.stock_theorique || '0'})
           </p>
-          
+
           {stockMessage && (
-            <div className={`mb-5 p-3 text-sm rounded-md ${stockMessage.type === 'success' ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20' : 'bg-red-50 text-red-700 ring-1 ring-red-600/20'}`}>
+            <div
+              className={`mb-5 rounded-md p-3 text-sm ${stockMessage.type === 'success' ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20' : 'bg-red-50 text-red-700 ring-1 ring-red-600/20'}`}
+            >
               {stockMessage.text}
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="text-sm font-medium text-foreground block mb-2">Entrepôt cible</label>
+              <label className="text-foreground mb-2 block text-sm font-medium">
+                Entrepôt cible
+              </label>
               <select
                 value={selectedWarehouse}
                 onChange={(e) => setSelectedWarehouse(e.target.value)}
-                className="w-full text-sm rounded-md border-0 bg-background text-foreground ring-1 ring-inset ring-border px-3 py-2 focus:ring-2 focus:ring-inset focus:ring-primary appearance-none"
+                className="bg-background text-foreground ring-border focus:ring-primary w-full appearance-none rounded-md border-0 px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
               >
                 {warehouses.length === 0 ? (
-                  <option value="" className="bg-background text-foreground">Aucun entrepôt configuré</option>
+                  <option value="" className="bg-background text-foreground">
+                    Aucun entrepôt configuré
+                  </option>
                 ) : (
-                  warehouses.map(w => (
-                    <option key={w.id} value={w.id} className="bg-background text-foreground">
+                  warehouses.map((w) => (
+                    <option
+                      key={w.id}
+                      value={w.id}
+                      className="bg-background text-foreground"
+                    >
                       {w.label || w.ref || w.id}
                     </option>
                   ))
@@ -466,20 +498,26 @@ export default function EditProductPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground block mb-2">Quantité à ajuster</label>
+              <label className="text-foreground mb-2 block text-sm font-medium">
+                Quantité à ajuster
+              </label>
               <div className="flex space-x-3">
-                <input 
+                <input
                   type="number"
                   value={stockQty}
-                  onChange={(e) => setStockQty(e.target.value ? Number(e.target.value) : '')}
+                  onChange={(e) =>
+                    setStockQty(e.target.value ? Number(e.target.value) : '')
+                  }
                   placeholder="Ex: +5 ou -2"
-                  className="flex-1 text-sm rounded-md border-0 bg-background text-foreground ring-1 ring-inset ring-border px-3 py-2 focus:ring-2 focus:ring-inset focus:ring-primary"
+                  className="bg-background text-foreground ring-border focus:ring-primary flex-1 rounded-md border-0 px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
                 />
                 <button
                   type="button"
                   onClick={handleAdjustStock}
-                  disabled={adjustingStock || warehouses.length === 0 || !stockQty}
-                  className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  disabled={
+                    adjustingStock || warehouses.length === 0 || !stockQty
+                  }
+                  className="bg-primary hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
                 >
                   {adjustingStock ? 'En cours...' : 'Ajuster'}
                 </button>
