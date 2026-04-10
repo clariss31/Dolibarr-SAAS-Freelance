@@ -1,11 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * @file app/(dashboard)/commerce/create/page.tsx
+ *
+ * Page de création d'une nouvelle proposition commerciale (devis).
+ *
+ * Ce composant gère :
+ * - Le chargement de la liste des tiers (clients/prospects).
+ * - La saisie des informations d'en-tête (Dolibarr exige `socid`, `datep`).
+ * - L'ajout dynamique de lignes de produits/services via ProposalLines.
+ * - L'envoi groupé à l'API Dolibarr (En-tête + Lignes dans le même appel).
+ */
+
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
-import { ApiError } from '../../../../types/dolibarr';
-import ProposalLines, { LocalLine } from '../../../../components/ui/ProposalLines';
+import ProposalLines, {
+  LocalLine,
+} from '../../../../components/ui/ProposalLines';
+
+// ---------------------------------------------------------------------------
+// Types et Helpers
+// ---------------------------------------------------------------------------
 
 interface ThirdPartyOption {
   id: string;
@@ -13,14 +30,27 @@ interface ThirdPartyOption {
   nom?: string;
 }
 
+/**
+ * Convertit une chaîne YYYY-MM-DD en timestamp Unix (secondes).
+ */
+function dateStringToTimestamp(dateStr: string): number | null {
+  if (!dateStr) return null;
+  return Math.floor(new Date(dateStr).getTime() / 1000);
+}
+
+// ---------------------------------------------------------------------------
+// Composant Principal
+// ---------------------------------------------------------------------------
+
 export default function CreateCommercePage() {
   const router = useRouter();
 
-  // Valeurs par défaut : Date du jour pour la proposition, +15 jours pour la validité
+  // --- Configuration initiale des dates +15j ---
   const today = new Date();
   const fifteenDaysLater = new Date(today);
   fifteenDaysLater.setDate(today.getDate() + 15);
 
+  // --- États ---
   const [formData, setFormData] = useState({
     socid: '',
     datep: today.toISOString().split('T')[0],
@@ -33,37 +63,41 @@ export default function CreateCommercePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Helper to convert YYYY-MM-DD back to timestamp (seconds)
-  const dateStringToTimestamp = (dateStr: string) => {
-    if (!dateStr) return null;
-    return Math.floor(new Date(dateStr).getTime() / 1000);
-  };
+  // --- Logique de récupération ---
 
-  // Charger la liste des tiers pour le sélecteur
-  useEffect(() => {
-    const fetchThirdParties = async () => {
-      try {
-        const response = await api.get('/thirdparties?sortfield=t.nom&sortorder=ASC&limit=500');
-        if (response.data && Array.isArray(response.data)) {
-          setThirdParties(response.data);
-        }
-      } catch (err) {
-        console.error('Erreur de chargement des tiers', err);
-      } finally {
-        setLoadingThirdParties(false);
+  /** Charge la liste des clients pour le sélecteur */
+  const fetchThirdParties = useCallback(async () => {
+    try {
+      const response = await api.get(
+        '/thirdparties?sortfield=t.nom&sortorder=ASC&limit=500'
+      );
+      if (response.data && Array.isArray(response.data)) {
+        setThirdParties(response.data);
       }
-    };
-    fetchThirdParties();
+    } catch (err) {
+      console.error('Échec de récupération des tiers', err);
+    } finally {
+      setLoadingThirdParties(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchThirdParties();
+  }, [fetchThirdParties]);
+
+  // --- Handlers ---
+
+  /** Gère les changements des inputs */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  /** Soumission du formulaire de création */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!formData.socid) {
       setError('Veuillez sélectionner un client ou prospect.');
       return;
@@ -72,12 +106,12 @@ export default function CreateCommercePage() {
     setSaving(true);
     setError('');
 
+    // Construction du payload complet
     const payload = {
       socid: parseInt(formData.socid, 10),
       datep: dateStringToTimestamp(formData.datep),
       fin_validite: dateStringToTimestamp(formData.fin_validite),
-      // Inclure les lignes directement dans le payload principal
-      // (l'endpoint POST /proposals/{id}/lines ignore le body JSON dans cette version de Dolibarr)
+      // Dolibarr permet d'envoyer les lignes directement lors du POST initial
       lines: lines.map((line) => ({
         fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
         product_type: line.product_type,
@@ -92,12 +126,15 @@ export default function CreateCommercePage() {
     try {
       const response = await api.post('/proposals', payload);
       const newProposalId = response.data as string | number;
+      // Redirection vers la fiche détaillée du nouveau devis
       router.push(`/commerce/${newProposalId}`);
     } catch (err: unknown) {
       setError(getErrorMessage(err));
       setSaving(false);
     }
   };
+
+  // --- Rendu ---
 
   return (
     <div className="space-y-6">
@@ -120,101 +157,97 @@ export default function CreateCommercePage() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
+        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
           {error}
         </div>
       )}
 
-      {/* Formulaire de création */}
+      {/* Formulaire Principal */}
       <form
         onSubmit={handleSubmit}
-        className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
+        className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm sm:p-8"
       >
         <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-          {/* Tiers / Client */}
+          {/* Sélection du Client */}
           <div className="sm:col-span-2">
             <label
               htmlFor="socid"
-              className="text-foreground block text-sm leading-6 font-medium"
+              className="text-foreground mb-2 block text-sm font-medium"
             >
               Client / Prospect *
             </label>
-            <div className="mt-2">
-              <select
-                id="socid"
-                name="socid"
-                required
-                disabled={loadingThirdParties}
-                value={formData.socid}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset disabled:opacity-50"
-              >
-                <option value="" disabled>
-                  {loadingThirdParties
-                    ? 'Chargement des clients...'
-                    : '-- Sélectionnez un client --'}
+            <select
+              id="socid"
+              name="socid"
+              required
+              disabled={loadingThirdParties}
+              value={formData.socid}
+              onChange={handleChange}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset disabled:opacity-50"
+            >
+              <option value="" disabled>
+                {loadingThirdParties
+                  ? 'Chargement des clients...'
+                  : '-- Sélectionnez un client --'}
+              </option>
+              {thirdParties.map((tier) => (
+                <option key={tier.id} value={tier.id}>
+                  {tier.name || tier.nom}
                 </option>
-                {thirdParties.map((tier) => (
-                  <option key={tier.id} value={tier.id}>
-                    {tier.name || tier.nom}
-                  </option>
-                ))}
-              </select>
-            </div>
+              ))}
+            </select>
           </div>
 
-          {/* Date de proposition */}
+          {/* Configuration des dates */}
           <div>
             <label
               htmlFor="datep"
-              className="text-foreground block text-sm leading-6 font-medium"
+              className="text-foreground mb-2 block text-sm font-medium"
             >
               Date de proposition *
             </label>
-            <div className="mt-2">
-              <input
-                type="date"
-                id="datep"
-                name="datep"
-                required
-                value={formData.datep}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-              />
-            </div>
+            <input
+              type="date"
+              id="datep"
+              name="datep"
+              required
+              value={formData.datep}
+              onChange={handleChange}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+            />
           </div>
 
-          {/* Date de fin de validité */}
           <div>
             <label
               htmlFor="fin_validite"
-              className="text-foreground block text-sm leading-6 font-medium"
+              className="text-foreground mb-2 block text-sm font-medium"
             >
               Date de fin de validité
             </label>
-            <div className="mt-2">
-              <input
-                type="date"
-                id="fin_validite"
-                name="fin_validite"
-                value={formData.fin_validite}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-              />
-            </div>
+            <input
+              type="date"
+              id="fin_validite"
+              name="fin_validite"
+              value={formData.fin_validite}
+              onChange={handleChange}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+            />
           </div>
         </div>
 
         {/* Lignes de produits / services */}
-        <ProposalLines lines={lines} onChange={setLines} />
+        <div className="pt-4">
+          <ProposalLines lines={lines} onChange={setLines} />
+        </div>
 
+        {/* Action finale */}
         <div className="border-border flex items-center justify-end border-t pt-6">
           <button
             type="submit"
             disabled={saving || loadingThirdParties}
-            className="btn-primary inline-flex justify-center px-4 py-2"
+            className="btn-primary inline-flex justify-center px-6 py-2 shadow-sm disabled:opacity-50"
           >
-            {saving ? 'Création en cours...' : 'Créer le devis'}
+            {saving ? 'Création...' : 'Créer le devis'}
           </button>
         </div>
       </form>

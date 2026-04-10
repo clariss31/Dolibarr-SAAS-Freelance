@@ -55,7 +55,7 @@ export default function StatCard({
           </p>
         </div>
         {description && (
-          <p className="text-muted mt-1 text-xs truncate">
+          <p className="text-muted mt-1 text-xs">
             {description}
           </p>
         )}

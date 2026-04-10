@@ -19,10 +19,18 @@ export default function DashboardRootPage() {
   const [stats, setStats] = useState({
     caHT: 0,
     caHTPrevious: 0,
+    caTTC: 0,
+    caTVA: 0,
     unpaidInvoicesHT: 0,
+    unpaidInvoicesTTC: 0,
+    unpaidInvoicesTVA: 0,
     unpaidInvoicesOverdueHT: 0,
     pendingProposalsHT: 0,
+    pendingProposalsTTC: 0,
+    pendingProposalsTVA: 0,
     upcomingSupplierHT: 0,
+    upcomingSupplierTTC: 0,
+    upcomingSupplierTVA: 0,
     upcomingSupplierOverdueHT: 0,
   });
 
@@ -99,7 +107,6 @@ export default function DashboardRootPage() {
           prevStartTs = prevEndTs - 30 * 24 * 3600 + 1;
         }
 
-        // We fetch KPIs and Lists using allSettled to ensure failure of one doesn't kill the whole page
         const [
           invoicesKpiRes,
           proposalsKpiRes,
@@ -122,33 +129,49 @@ export default function DashboardRootPage() {
           api.get('/supplierinvoices?limit=5&sortfield=t.tms&sortorder=DESC'),
         ]);
 
-        // Process results
+        const nowTs = Math.floor(Date.now() / 1000);
+
         const newStats = {
           caHT: 0,
           caHTPrevious: 0,
+          caTTC: 0,
+          caTVA: 0,
           unpaidInvoicesHT: 0,
+          unpaidInvoicesTTC: 0,
+          unpaidInvoicesTVA: 0,
           unpaidInvoicesOverdueHT: 0,
           pendingProposalsHT: 0,
+          pendingProposalsTTC: 0,
+          pendingProposalsTVA: 0,
           upcomingSupplierHT: 0,
+          upcomingSupplierTTC: 0,
+          upcomingSupplierTVA: 0,
           upcomingSupplierOverdueHT: 0,
         };
-
-        const nowTs = Math.floor(Date.now() / 1000);
 
         if (
           invoicesKpiRes.status === 'fulfilled' &&
           invoicesKpiRes.value.data
         ) {
           const invs: Invoice[] = invoicesKpiRes.value.data;
-          newStats.caHT = invs
-            .filter(
-              (inv) =>
-                inv.date &&
-                Number(inv.date) >= startTs &&
-                Number(inv.date) <= endTs &&
-                Number(inv.statut) > 0
-            )
-            .reduce((acc, inv) => acc + Number(inv.total_ht || 0), 0);
+
+          const currentInvs = invs.filter(
+            (inv) =>
+              inv.date &&
+              Number(inv.date) >= startTs &&
+              Number(inv.date) <= endTs &&
+              Number(inv.statut) > 0
+          );
+
+          newStats.caHT = currentInvs.reduce(
+            (acc, inv) => acc + Number(inv.total_ht || 0),
+            0
+          );
+          newStats.caTTC = currentInvs.reduce(
+            (acc, inv) => acc + Number(inv.total_ttc || 0),
+            0
+          );
+          newStats.caTVA = newStats.caTTC - newStats.caHT;
 
           newStats.caHTPrevious = invs
             .filter(
@@ -162,9 +185,16 @@ export default function DashboardRootPage() {
 
           const unpaid = invs.filter((inv) => Number(inv.statut) === 1);
           newStats.unpaidInvoicesHT = unpaid.reduce(
-            (a, b) => a + Number(b.total_ht || 0),
+            (acc, inv) => acc + Number(inv.total_ht || 0),
             0
           );
+          newStats.unpaidInvoicesTTC = unpaid.reduce(
+            (acc, inv) => acc + Number(inv.total_ttc || 0),
+            0
+          );
+          newStats.unpaidInvoicesTVA =
+            newStats.unpaidInvoicesTTC - newStats.unpaidInvoicesHT;
+
           newStats.unpaidInvoicesOverdueHT = unpaid
             .filter((inv) =>
               isOverdue(
@@ -172,7 +202,7 @@ export default function DashboardRootPage() {
                 nowTs
               )
             )
-            .reduce((a, b) => a + Number(b.total_ht || 0), 0);
+            .reduce((acc, inv) => acc + Number(inv.total_ht || 0), 0);
         }
 
         if (
@@ -184,6 +214,12 @@ export default function DashboardRootPage() {
             (acc, prop) => acc + Number(prop.total_ht || 0),
             0
           );
+          newStats.pendingProposalsTTC = props.reduce(
+            (acc, prop) => acc + Number(prop.total_ttc || 0),
+            0
+          );
+          newStats.pendingProposalsTVA =
+            newStats.pendingProposalsTTC - newStats.pendingProposalsHT;
         }
 
         if (
@@ -197,6 +233,12 @@ export default function DashboardRootPage() {
             (acc, inv) => acc + Number(inv.total_ht || 0),
             0
           );
+          newStats.upcomingSupplierTTC = upcoming.reduce(
+            (acc, inv) => acc + Number(inv.total_ttc || 0),
+            0
+          );
+          newStats.upcomingSupplierTVA =
+            newStats.upcomingSupplierTTC - newStats.upcomingSupplierHT;
 
           newStats.upcomingSupplierOverdueHT = upcoming
             .filter((inv) =>
@@ -205,7 +247,7 @@ export default function DashboardRootPage() {
                 nowTs
               )
             )
-            .reduce((a, b) => a + Number(b.total_ht || 0), 0);
+            .reduce((acc, inv) => acc + Number(inv.total_ht || 0), 0);
         }
 
         setStats(newStats);
@@ -487,23 +529,23 @@ export default function DashboardRootPage() {
         return (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              label="Chiffre d'affaires"
+              label="Chiffre d'affaires HT"
               value={formatCurrency(stats.caHT)}
               trend={caTrend}
               icon="📈"
               colorClassName="text-blue-600"
-              description="Chiffre d'affaires facturé sur la période"
+              description={`${formatCurrency(stats.caTTC)} TTC - ${formatCurrency(stats.caTVA)} TVA`}
             />
             <StatCard
-              label="Devis en attente"
+              label="Devis en attente HT"
               value={formatCurrency(stats.pendingProposalsHT)}
               icon="📄"
               colorClassName="text-purple-600"
-              description="Total des propositions ouvertes"
+              description={`${formatCurrency(stats.pendingProposalsTTC)} TTC - ${formatCurrency(stats.pendingProposalsTVA)} TVA`}
               href="/commerce"
             />
             <StatCard
-              label="Factures clients impayées"
+              label="Factures clients impayées HT"
               value={formatCurrency(stats.unpaidInvoicesHT)}
               subValue={
                 stats.unpaidInvoicesOverdueHT > 0
@@ -512,11 +554,11 @@ export default function DashboardRootPage() {
               }
               icon="⏳"
               colorClassName="text-amber-600"
-              description="En attente de règlement client"
+              description={`${formatCurrency(stats.unpaidInvoicesTTC)} TTC - ${formatCurrency(stats.unpaidInvoicesTVA)} TVA`}
               href="/billing-payments"
             />
             <StatCard
-              label="Factures fourniss. impayées"
+              label="Factures fourn. impayées HT"
               value={formatCurrency(stats.upcomingSupplierHT)}
               subValue={
                 stats.upcomingSupplierOverdueHT > 0
@@ -525,7 +567,7 @@ export default function DashboardRootPage() {
               }
               icon="💳"
               colorClassName="text-red-600"
-              description="Paiements fournisseurs non réglés"
+              description={`${formatCurrency(stats.upcomingSupplierTTC)} TTC - ${formatCurrency(stats.upcomingSupplierTVA)} TVA`}
               href="/billing-payments"
             />
           </div>

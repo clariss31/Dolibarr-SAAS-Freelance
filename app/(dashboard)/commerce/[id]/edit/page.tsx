@@ -1,48 +1,63 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * @file app/(dashboard)/commerce/[id]/edit/page.tsx
+ *
+ * Page d'édition d'une proposition commerciale (devis) Dolibarr.
+ *
+ * Fonctionnalités :
+ * - Chargement des données de l'en-tête (dates, statut).
+ * - Résolution dynamique du nom du tiers.
+ * - Gestion synchronisée des lignes de devis (suppression/recréation pour les brouillons).
+ * - Suppression définitive du devis.
+ */
+
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
-import {
-  Proposal,
-  ProposalLine,
-  ApiError,
-} from '../../../../../types/dolibarr';
+import { Proposal, ProposalLine } from '../../../../../types/dolibarr';
 import { getErrorMessage } from '../../../../../utils/error-handler';
 import ProposalLines, {
   LocalLine,
 } from '../../../../../components/ui/ProposalLines';
 
-/** Transforme une ligne API Dolibarr en ligne locale (avec clé unique React).
- *  Dolibarr utilise `product_label` pour le nom du produit et renvoie les
- *  valeurs numériques sous forme de strings — on normalise tout ici. */
+// ---------------------------------------------------------------------------
+// Helpers (Extract outside component for better performance/purity)
+// ---------------------------------------------------------------------------
+
+/**
+ * Transforme une ligne API Dolibarr en ligne locale (avec clé unique React).
+ *
+ * @param line - La ligne brute provenant de l'API.
+ * @param index - Index de secours pour la clé.
+ * @returns La ligne formatée pour l'interface utilisateur.
+ */
 function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
-  // Résolution du libellé : Dolibarr stocke le nom du produit dans product_label
   const resolvedLabel: string =
     line.product_label ||
     line.label ||
     line.description ||
     `Ligne ${index + 1}`;
-  // Résolution de l'ID de ligne
-  const lineId = line.id ?? line.id;
-  // Prix unitaire : subprice ou son alias `up`
+
   const unitPrice = Number(line.subprice ?? 0);
   const qty = Number(line.qty) || 1;
   const tva = Number(line.tva_tx) || 0;
   const remise = Number(line.remise_percent) || 0;
-  // Recalcul local si les totaux fournis par l'API sont à 0
+
+  // Recalcul local si les totaux fournis par l'API sont absents
   const base_ht = qty * unitPrice;
   const totalHt =
-    Number(line.total_ht) || parseFloat((base_ht * (1 - remise / 100)).toFixed(2));
+    Number(line.total_ht) ||
+    parseFloat((base_ht * (1 - remise / 100)).toFixed(2));
   const totalTtc =
     Number(line.total_ttc) ||
     parseFloat((totalHt * (1 + tva / 100)).toFixed(2));
 
   return {
-    _key: `existing-${lineId ?? index}-${Date.now()}`,
-    id: lineId ? String(lineId) : undefined,
+    _key: `existing-${line.id ?? index}-${Date.now()}`,
+    id: line.id ? String(line.id) : undefined,
     fk_product: line.fk_product ? String(line.fk_product) : undefined,
-    product_type: 0, // Valeur par défaut — Dolibarr le remplit depuis fk_product
+    product_type: 0,
     label: resolvedLabel,
     qty,
     subprice: unitPrice,
@@ -53,10 +68,42 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
   };
 }
 
+/**
+ * Convertit un timestamp (secondes) en chaîne YYYY-MM-DD pour les inputs HTML5.
+ */
+function timestampToDateString(ts: string | number | undefined): string {
+  if (!ts) return '';
+  const date = new Date(Number(ts) * 1000);
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Convertit une chaîne YYYY-MM-DD en timestamp (secondes).
+ */
+function dateStringToTimestamp(dateStr: string): number | null {
+  if (!dateStr) return null;
+  return Math.floor(new Date(dateStr).getTime() / 1000);
+}
+
+// ---------------------------------------------------------------------------
+// Composant Page
+// ---------------------------------------------------------------------------
+
+/**
+ * Page d'édition principale.
+ */
 export default function EditCommercePage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+
+  // --- États ---
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const [proposalRef, setProposalRef] = useState('');
+  const [clientName, setClientName] = useState('Chargement...');
 
   const [formData, setFormData] = useState({
     statut: '0',
@@ -66,131 +113,104 @@ export default function EditCommercePage() {
 
   const [lines, setLines] = useState<LocalLine[]>([]);
   const [originalLineIds, setOriginalLineIds] = useState<string[]>([]);
-  const [proposalRef, setProposalRef] = useState('');
-  const [clientName, setClientName] = useState('Chargement...');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
 
-  // Helper to convert timestamp (seconds) to YYYY-MM-DD for <input type="date">
-  const timestampToDateString = (ts: string | number | undefined) => {
-    if (!ts) return '';
-    const date = new Date(Number(ts) * 1000);
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
+  // --- Logique de récupération ---
 
-  // Helper to convert YYYY-MM-DD back to timestamp (seconds)
-  const dateStringToTimestamp = (dateStr: string) => {
-    if (!dateStr) return null;
-    return Math.floor(new Date(dateStr).getTime() / 1000);
-  };
+  /** Charge les données du devis */
+  const fetchProposal = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError('');
 
-  useEffect(() => {
-    const fetchProposal = async () => {
-      try {
-        const response = await api.get(`/proposals/${id}`);
-        if (response.data) {
-          const d = response.data as Proposal;
-          setProposalRef(d.ref);
-          setFormData({
-            statut: String(d.statut ?? '0'),
-            datep: timestampToDateString(d.datep),
-            fin_validite: timestampToDateString(d.fin_validite),
-          });
+    try {
+      const response = await api.get(`/proposals/${id}`);
+      if (response.data) {
+        const d = response.data as Proposal;
+        setProposalRef(d.ref);
+        setFormData({
+          statut: String(d.statut ?? '0'),
+          datep: timestampToDateString(d.datep),
+          fin_validite: timestampToDateString(d.fin_validite),
+        });
 
-          // Chargement des lignes existantes
-          if (d.lines && Array.isArray(d.lines) && d.lines.length > 0) {
-            const localLines = d.lines.map(apiLineToLocal);
-            setLines(localLines);
-            setOriginalLineIds(
-              d.lines.map((l) => l.id).filter(Boolean) as string[]
-            );
-          } else {
-            // Fallback : charger via endpoint dédié
-            try {
-              const linesResp = await api.get(`/proposals/${id}/lines`);
-              if (linesResp.data && Array.isArray(linesResp.data)) {
-                const apiLines = linesResp.data as ProposalLine[];
-                setLines(apiLines.map(apiLineToLocal));
-                setOriginalLineIds(
-                  apiLines.map((l) => l.id).filter(Boolean) as string[]
-                );
-              }
-            } catch {
-              // Pas de lignes existantes
+        // Chargement des lignes avec fallback sur endpoint dédié
+        let apiLines: ProposalLine[] = d.lines || [];
+        if (apiLines.length === 0) {
+          try {
+            const linesResp = await api.get(`/proposals/${id}/lines`);
+            if (Array.isArray(linesResp.data)) {
+              apiLines = linesResp.data as ProposalLine[];
             }
-          }
-
-          // Résolution du nom du tiers
-          if (d.thirdparty?.name) {
-            setClientName(d.thirdparty.name);
-          } else if (d.soc_name || d.name) {
-            setClientName(d.soc_name || d.name || '');
-          } else if (d.socid) {
-            try {
-              const tierResp = await api.get(`/thirdparties/${d.socid}`);
-              setClientName(
-                tierResp.data?.name ||
-                  tierResp.data?.nom ||
-                  `Tiers ID: ${d.socid}`
-              );
-            } catch {
-              setClientName(`Tiers ID: ${d.socid}`);
-            }
-          } else {
-            setClientName('Inconnu');
+          } catch (e) {
+            /* Pas de lignes */
           }
         }
-      } catch (err) {
-        setError(getErrorMessage(err));
-      } finally {
-        setLoading(false);
+
+        setLines(apiLines.map(apiLineToLocal));
+        setOriginalLineIds(
+          apiLines.map((l) => l.id).filter(Boolean) as string[]
+        );
+
+        // Résolution du tiers (Priorité aux données incluses, sinon appel API)
+        if (d.thirdparty?.name) {
+          setClientName(d.thirdparty.name);
+        } else if (d.soc_name || d.name) {
+          setClientName(d.soc_name || d.name || '');
+        } else if (d.socid) {
+          const tierResp = await api.get(`/thirdparties/${d.socid}`);
+          setClientName(tierResp.data?.name || `Tiers ID: ${d.socid}`);
+        } else {
+          setClientName('Inconnu');
+        }
       }
-    };
-    if (id) fetchProposal();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
+  useEffect(() => {
+    fetchProposal();
+  }, [fetchProposal]);
+
+  // --- Handlers ---
+
+  /** Mise à jour des champs texte/select */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  /** Soumission du formulaire */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError('');
 
-    // Payload de base pour l'en-tête du devis (dates, statut)
-    const payload: Record<string, unknown> = {
+    const payload = {
       statut: parseInt(formData.statut, 10),
       datep: dateStringToTimestamp(formData.datep),
       fin_validite: dateStringToTimestamp(formData.fin_validite),
     };
 
     try {
-      // 1. Mise à jour de l'en-tête
+      // 1. Mise à jour de l'en-tête (Dates, Statut)
       await api.put(`/proposals/${id}`, payload);
 
-      // 2. Si le devis est en brouillon, synchroniser les lignes
+      // 2. Synchronisation des lignes (Uniquement si Brouillon '0')
       if (formData.statut === '0') {
-        // A. Suppression de toutes les lignes existantes
-        // Note : On utilise l'ID conservé au chargement initial
-        const currentOriginalIds = [...originalLineIds];
-        for (const lineId of currentOriginalIds) {
+        // Suppression massive des anciennes lignes
+        for (const lineId of originalLineIds) {
           try {
             await api.delete(`/proposals/${id}/lines/${lineId}`);
-          } catch (err) {
-            console.warn(
-              `Ligne ${lineId} déjà absente ou impossible à supprimer`
-            );
+          } catch (e) {
+            /* Ligne déjà absente */
           }
         }
 
-        // B. Ajout de chaque ligne une par une
+        // Création des nouvelles lignes
         for (const line of lines) {
           await api.post(`/proposals/${id}/line`, {
             fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
@@ -211,15 +231,15 @@ export default function EditCommercePage() {
     }
   };
 
+  /** Suppression définitive du devis */
   const handleDelete = async () => {
     if (
       !window.confirm(
-        'Êtes-vous sûr de vouloir supprimer définitivement ce devis ? Cette action est irréversible.'
+        'Voulez-vous supprimer ce devis ? Cette action est irréversible.'
       )
-    ) {
+    )
       return;
-    }
-    
+
     setError('');
     try {
       await api.delete(`/proposals/${id}`);
@@ -229,33 +249,39 @@ export default function EditCommercePage() {
     }
   };
 
+  // --- Rendu ---
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-muted text-center text-sm">
-          Chargement de la fiche d'édition...
+      <div className="flex animate-pulse items-center justify-center py-20">
+        <div className="text-muted text-sm italic">
+          Préparation du formulaire d'édition...
         </div>
       </div>
     );
   }
 
-  // Les lignes ne sont modifiables que si le devis est en brouillon
   const isDraft = formData.statut === '0';
 
   return (
     <div className="space-y-6">
-      {/* En-tête de la page d'édition */}
+      {/* Header */}
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
             Modifier le devis {proposalRef}
           </h1>
           <p className="text-muted mt-1 text-sm">
-            Modification de l'état, des dates et des lignes du devis.
+            Modification de l'état, des dates et du détail commercial.
           </p>
         </div>
-        <div className="flex items-center space-x-6">
-          
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleDelete}
+            className="text-sm font-medium text-red-500 transition-colors hover:text-red-600"
+          >
+            Supprimer
+          </button>
           <button
             onClick={() => router.back()}
             className="text-muted hover:text-foreground text-sm font-medium transition-colors"
@@ -266,121 +292,114 @@ export default function EditCommercePage() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
+        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
           {error}
         </div>
       )}
 
-      {/* Formulaire */}
+      {/* Formulaire Principal */}
       <form
         onSubmit={handleSubmit}
-        className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
+        className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm sm:p-8"
       >
         <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-          {/* Client Associé (Lecture Seule) */}
+          {/* Tiers Associé */}
           <div className="sm:col-span-2">
-            <label
-              htmlFor="clientName"
-              className="text-foreground block text-sm leading-6 font-medium"
-            >
+            <label className="text-foreground mb-2 block text-sm font-medium">
               Client / Prospect
             </label>
-            <div className="mt-2">
-              <input
-                type="text"
-                id="clientName"
-                value={clientName}
-                disabled
-                className="bg-muted/10 text-foreground ring-border block w-full cursor-not-allowed rounded-md border-0 px-3 py-2 opacity-70 ring-1 ring-inset sm:text-sm sm:leading-6"
-              />
-            </div>
+            <input
+              type="text"
+              value={clientName}
+              disabled
+              className="bg-muted/10 text-foreground ring-border block w-full cursor-not-allowed rounded-md border-0 px-3 py-2 opacity-70 ring-1 ring-inset sm:text-sm"
+            />
           </div>
 
-          {/* Statut */}
+          {/* Statut du devis */}
           <div className="sm:col-span-2">
             <label
               htmlFor="statut"
-              className="text-foreground block text-sm leading-6 font-medium"
+              className="text-foreground mb-2 block text-sm font-medium"
             >
               État du devis *
             </label>
-            <div className="mt-2">
-              <select
-                id="statut"
-                name="statut"
-                required
-                value={formData.statut}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
-              >
-                <option value="0">Brouillon</option>
-                <option value="1">Ouvert</option>
-                <option value="2">Signé</option>
-                <option value="3">Non signé</option>
-                <option value="4">Facturé</option>
-              </select>
-            </div>
+            <select
+              id="statut"
+              name="statut"
+              required
+              value={formData.statut}
+              onChange={handleChange}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+            >
+              <option value="0">Brouillon</option>
+              <option value="1">Ouvert</option>
+              <option value="2">Signé</option>
+              <option value="3">Non signé</option>
+              <option value="4">Facturé</option>
+            </select>
           </div>
 
-          {/* Date de proposition */}
+          {/* Dates */}
           <div>
             <label
               htmlFor="datep"
-              className="text-foreground block text-sm leading-6 font-medium"
+              className="text-foreground mb-2 block text-sm font-medium"
             >
               Date de proposition *
             </label>
-            <div className="mt-2">
-              <input
-                type="date"
-                id="datep"
-                name="datep"
-                required
-                value={formData.datep}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-              />
-            </div>
+            <input
+              type="date"
+              id="datep"
+              name="datep"
+              required
+              value={formData.datep}
+              onChange={handleChange}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+            />
           </div>
 
-          {/* Date de fin de validité */}
           <div>
             <label
               htmlFor="fin_validite"
-              className="text-foreground block text-sm leading-6 font-medium"
+              className="text-foreground mb-2 block text-sm font-medium"
             >
               Date de fin de validité
             </label>
-            <div className="mt-2">
-              <input
-                type="date"
-                id="fin_validite"
-                name="fin_validite"
-                value={formData.fin_validite}
-                onChange={handleChange}
-                className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
-              />
-            </div>
+            <input
+              type="date"
+              id="fin_validite"
+              name="fin_validite"
+              value={formData.fin_validite}
+              onChange={handleChange}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+            />
           </div>
         </div>
 
-        {/* Lignes de produits / services */}
-        <ProposalLines lines={lines} onChange={setLines} disabled={!isDraft} />
+        {/* Lignes du devis */}
+        <div className="space-y-4">
+          <ProposalLines
+            lines={lines}
+            onChange={setLines}
+            disabled={!isDraft}
+          />
+          {!isDraft && (
+            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+              💡 Les lignes ne sont modifiables que lorsque le devis est en mode{' '}
+              <strong>Brouillon</strong>.
+            </p>
+          )}
+        </div>
 
-        {!isDraft && (
-          <p className="text-muted -mt-2 text-xs">
-            Les lignes ne peuvent être modifiées que sur un devis en statut{' '}
-            <strong>Brouillon</strong>.
-          </p>
-        )}
-
+        {/* Actions */}
         <div className="border-border flex items-center justify-end border-t pt-6">
           <button
             type="submit"
             disabled={saving}
-            className="btn-primary inline-flex justify-center px-4 py-2"
+            className="btn-primary inline-flex justify-center px-6 py-2 shadow-sm disabled:opacity-50"
           >
-            {saving ? 'Sauvegarde en cours...' : 'Enregistrer'}
+            {saving ? 'Sauvegarde...' : 'Enregistrer'}
           </button>
         </div>
       </form>
