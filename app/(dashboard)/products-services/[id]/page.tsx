@@ -1,22 +1,96 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * @file app/(dashboard)/products-services/[id]/page.tsx
+ *
+ * Page de détail d'un produit ou d'un service Dolibarr.
+ *
+ * Fonctionnalités :
+ * - Affichage complet des informations (Réf, Libellé, Type).
+ * - Visualisation des prix HT, TTC et taux de TVA.
+ * - Suivi des stocks physiques et virtuels pour les produits.
+ * - Rendu de la description détaillée (support HTML).
+ * - Actions de modification et de suppression.
+ */
+
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams, notFound } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Product, ApiError } from '../../../../types/dolibarr';
+
+// ---------------------------------------------------------------------------
+// Helpers (Extract outside component for purity and performance)
+// ---------------------------------------------------------------------------
+
+/** Formate un montant en Euros. */
+function formatCurrency(price: string | number | undefined): string {
+  if (price === undefined) return '0,00 €';
+  const num = typeof price === 'string' ? parseFloat(price) : Number(price);
+  if (isNaN(num)) return '0,00 €';
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(num);
+}
+
+/** Formate un taux de TVA. */
+function formatPercent(value: string | number | undefined): string {
+  if (value === undefined || value === '') return '—';
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+  if (isNaN(num)) return '—';
+  return `${num} %`;
+}
+
+// ---------------------------------------------------------------------------
+// Composant Principal
+// ---------------------------------------------------------------------------
 
 export default function ProductDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
 
+  // --- États ---
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [deleting, setDeleting] = useState(false);
 
+  // --- Logique de récupération ---
+
+  /** Charge les données du produit */
+  const fetchProduct = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await api.get(`/products/${id}`);
+      if (response.data) {
+        setProduct(response.data);
+      } else {
+        setError('Produit/Service introuvable.');
+      }
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      if (apiErr.response?.status === 404) {
+        notFound();
+      } else {
+        setError(getErrorMessage(err));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchProduct();
+  }, [fetchProduct]);
+
+  // --- Handlers ---
+
+  /** Supprime définitivement le produit après confirmation */
   const handleDelete = async () => {
     if (
       !window.confirm(
@@ -24,6 +98,7 @@ export default function ProductDetailsPage() {
       )
     )
       return;
+
     setDeleting(true);
     setError('');
     try {
@@ -35,35 +110,12 @@ export default function ProductDetailsPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        const response = await api.get(`/products/${id}`);
-        if (response.data) {
-          setProduct(response.data);
-        } else {
-          setError('Produit/Service introuvable.');
-        }
-      } catch (err: unknown) {
-        const apiErr = err as ApiError;
-        if (apiErr.response?.status === 404) {
-          notFound();
-        } else {
-          setError(getErrorMessage(err));
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (id) fetchProduct();
-  }, [id]);
+  // --- Rendu conditionnel (Chargement / Erreur) ---
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-muted text-center text-sm">
-          Chargement des détails de la fiche...
-        </div>
+      <div className="text-muted flex items-center justify-center py-20 text-sm italic">
+        Chargement des détails de la fiche...
       </div>
     );
   }
@@ -73,11 +125,11 @@ export default function ProductDetailsPage() {
       <div className="space-y-4">
         <button
           onClick={() => router.push('/products-services')}
-          className="text-primary decoration-primary text-sm hover:underline"
+          className="text-primary text-sm hover:underline"
         >
           &larr; Retour au catalogue
         </button>
-        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset">
+        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
           {error || 'Introuvable'}
         </div>
       </div>
@@ -85,6 +137,8 @@ export default function ProductDetailsPage() {
   }
 
   const isService = String(product.type) === '1';
+
+  // --- Rendu Principal ---
 
   return (
     <div className="space-y-6">
@@ -97,7 +151,7 @@ export default function ProductDetailsPage() {
         </button>
       </div>
 
-      {/* Title Header */}
+      {/* Header : Titre et Actions */}
       <div className="border-border border-b py-2 sm:flex sm:items-center sm:justify-between">
         <div className="flex items-center space-x-4">
           <span className="text-4xl">{isService ? '⚙️' : '📦'}</span>
@@ -125,21 +179,21 @@ export default function ProductDetailsPage() {
         </div>
       </div>
 
-      {/* Grid panels */}
+      {/* Contenu Principal : Grille d'informations */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        {/* Paramètres d'État */}
+        {/* Panneau : Type & état */}
         <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
           <div className="border-border bg-background border-b px-5 py-4">
-            <h3 className="text-foreground text-base leading-6 font-semibold">
+            <h3 className="text-foreground text-base font-semibold">
               Type & état
             </h3>
           </div>
-          <div className="flex flex-wrap items-end gap-x-12 gap-y-6 p-5">
+          <div className="flex flex-wrap items-start gap-x-12 gap-y-6 p-5">
             <div>
-              <p className="text-muted text-xs font-medium tracking-wider uppercase">
+              <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
                 Type
               </p>
-              <p className="text-foreground mt-1 font-medium">
+              <p className="text-foreground font-medium">
                 {isService ? 'Service' : 'Produit'}
               </p>
             </div>
@@ -148,11 +202,11 @@ export default function ProductDetailsPage() {
                 État (Vente)
               </p>
               {String(product.tosell) === '1' ? (
-                <span className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300">
+                <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-green-600/20 ring-inset dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
                   En vente
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 ring-inset dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
                   Hors vente
                 </span>
               )}
@@ -162,11 +216,11 @@ export default function ProductDetailsPage() {
                 État (Achat)
               </p>
               {String(product.tobuy) === '1' ? (
-                <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-700/10 ring-inset dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/30">
                   En achat
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 ring-inset dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
                   Hors achat
                 </span>
               )}
@@ -174,51 +228,45 @@ export default function ProductDetailsPage() {
           </div>
         </div>
 
-        {/* Pricing Info */}
+        {/* Panneau : Tarification */}
         <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
           <div className="border-border bg-background border-b px-5 py-4">
-            <h3 className="text-foreground text-base leading-6 font-semibold">
+            <h3 className="text-foreground text-base font-semibold">
               Prix de vente
             </h3>
           </div>
-          <div className="flex flex-wrap items-end gap-x-12 gap-y-6 p-5">
+          <div className="flex flex-wrap items-start gap-x-12 gap-y-6 p-5">
             <div>
-              <p className="text-muted text-xs font-medium tracking-wider uppercase">
+              <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
                 Prix HT
               </p>
-              <p className="text-foreground mt-1 text-2xl font-bold">
-                {product.price
-                  ? `${parseFloat(String(product.price)).toFixed(2)} €`
-                  : '0.00 €'}
+              <p className="text-foreground text-2xl font-bold">
+                {formatCurrency(product.price)}
               </p>
             </div>
             <div>
-              <p className="text-muted text-xs font-medium tracking-wider uppercase">
+              <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
                 TVA
               </p>
-              <p className="text-foreground mt-1 text-2xl font-bold">
-                {product.tva_tx
-                  ? `${parseFloat(String(product.tva_tx))} %`
-                  : '—'}
+              <p className="text-foreground text-2xl font-bold">
+                {formatPercent(product.tva_tx)}
               </p>
             </div>
             <div>
-              <p className="text-muted text-xs font-medium tracking-wider uppercase">
+              <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
                 Prix TTC
               </p>
-              <p className="text-foreground mt-1 text-2xl font-bold">
-                {product.price_ttc
-                  ? `${parseFloat(String(product.price_ttc)).toFixed(2)} €`
-                  : '0.00 €'}
+              <p className="text-foreground text-2xl font-bold">
+                {formatCurrency(product.price_ttc)}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Description Description */}
+        {/* Panneau : Description détaillée */}
         <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md sm:col-span-2">
           <div className="border-border bg-background border-b px-5 py-4">
-            <h3 className="text-foreground text-base leading-6 font-semibold">
+            <h3 className="text-foreground text-base font-semibold">
               Description détaillée
             </h3>
           </div>
@@ -236,11 +284,11 @@ export default function ProductDetailsPage() {
           </div>
         </div>
 
-        {/* Stock Info (for products only) */}
+        {/* Panneau : Stocks (Produits uniquement) */}
         {!isService && (
           <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md sm:col-span-2">
             <div className="border-border bg-background border-b px-5 py-4">
-              <h3 className="text-foreground text-base leading-6 font-semibold">
+              <h3 className="text-foreground text-base font-semibold">
                 Gestion des stocks
               </h3>
             </div>

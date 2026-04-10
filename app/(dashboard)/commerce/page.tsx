@@ -2,9 +2,9 @@
 
 /**
  * @file app/(dashboard)/commerce/page.tsx
- * 
+ *
  * Page de liste des propositions commerciales (devis).
- * 
+ *
  * Ce composant gère :
  * - La liste paginée des devis Dolibarr.
  * - Le filtrage par statut et la recherche par texte (debouncée).
@@ -22,11 +22,12 @@ import { Proposal, ApiError, ThirdParty } from '../../../types/dolibarr';
 // Constantes et Helpers
 // ---------------------------------------------------------------------------
 
-const PAGE_LIMIT = 20;
+const PAGE_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
 /** Formate un prix en Euros. */
-function formatCurrency(price: string | number): string {
+function formatCurrency(price: string | number | undefined): string {
+  if (price === undefined) return '0,00 €';
   const num = typeof price === 'string' ? parseFloat(price) : Number(price);
   if (isNaN(num)) return '-';
   return new Intl.NumberFormat('fr-FR', {
@@ -38,9 +39,10 @@ function formatCurrency(price: string | number): string {
 /** Formate un timestamp Dolibarr en date dd/mm/yyyy. */
 function formatDate(timestamp: string | number | undefined): string {
   if (!timestamp) return '-';
-  const ts = typeof timestamp === 'string' ? parseInt(timestamp, 10) : Number(timestamp);
+  const ts =
+    typeof timestamp === 'string' ? parseInt(timestamp, 10) : Number(timestamp);
   if (isNaN(ts) || ts === 0) return '-';
-  return new Date(ts * 1000).toLocaleDateString('fr-FR');
+  return new Intl.DateTimeFormat('fr-FR').format(new Date(ts * 1000));
 }
 
 // ---------------------------------------------------------------------------
@@ -92,24 +94,27 @@ export default function CommercePage() {
   const router = useRouter();
 
   // --- États ---
-  const [proposals,       setProposals]       = useState<Proposal[]>([]);
-  const [thirdPartiesMap, setThirdPartiesMap] = useState<Record<string, string>>({});
-  const [loading,         setLoading]         = useState(true);
-  const [loadingTiers,   setLoadingTiers]   = useState(true);
-  const [error,           setError]           = useState('');
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [thirdPartiesMap, setThirdPartiesMap] = useState<
+    Record<string, string>
+  >({});
+  const [loading, setLoading] = useState(true);
+  const [loadingTiers, setLoadingTiers] = useState(true);
+  const [error, setError] = useState('');
 
-  const [page,       setPage]       = useState(1);
+  const [page, setPage] = useState(0); // Index 0 pour correspondre à billing
   const [totalItems, setTotalItems] = useState(0);
 
-  const [searchTerm,      setSearchTerm]      = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter,    setStatusFilter]    = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // --- Effets ---
 
   /** Pré-chargement des tiers (Mapping ID -> Nom) */
   useEffect(() => {
-    api.get('/thirdparties?limit=1000')
+    api
+      .get('/thirdparties?limit=1000')
       .then((res) => {
         if (res.data) {
           const dict: Record<string, string> = {};
@@ -133,7 +138,7 @@ export default function CommercePage() {
 
   /** Reset de la pagination lors des changements de filtre */
   useEffect(() => {
-    setPage(1);
+    setPage(0);
   }, [debouncedSearch, statusFilter]);
 
   /** Chargement des devis via l'API */
@@ -142,7 +147,7 @@ export default function CommercePage() {
     setError('');
 
     try {
-      let query = `/proposals?sortfield=t.rowid&sortorder=DESC&limit=${PAGE_LIMIT}&page=${page - 1}`;
+      let query = `/proposals?sortfield=t.rowid&sortorder=DESC&limit=${PAGE_LIMIT}&page=${page}`;
       const conditions: string[] = [];
 
       if (statusFilter !== 'all') {
@@ -151,7 +156,9 @@ export default function CommercePage() {
 
       if (debouncedSearch) {
         const cleanTerm = debouncedSearch.replace(/'/g, "''");
-        conditions.push(`((t.ref:like:'%${cleanTerm}%') OR (s.nom:like:'%${cleanTerm}%'))`);
+        conditions.push(
+          `((t.ref:like:'%${cleanTerm}%') OR (s.nom:like:'%${cleanTerm}%'))`
+        );
       }
 
       if (conditions.length > 0) {
@@ -161,14 +168,14 @@ export default function CommercePage() {
       const response = await api.get(query);
       if (response.data) {
         setProposals(response.data);
-        
-        // Récupération de la pagination depuis les headers HTTP
         const total = response.headers?.get('X-Total-Count');
         if (total) {
           setTotalItems(parseInt(total, 10));
         } else {
-          // Fallback sil'header est absent (estimation)
-          setTotalItems(response.data.length + (response.data.length === PAGE_LIMIT ? PAGE_LIMIT : 0));
+          setTotalItems(
+            response.data.length +
+              (response.data.length === PAGE_LIMIT ? PAGE_LIMIT : 0)
+          );
         }
       } else {
         setProposals([]);
@@ -193,16 +200,17 @@ export default function CommercePage() {
 
   // --- Handlers & Helpers ---
 
-  /** Résout le nom du client depuis le devis ou le mapping pré-chargé */
   const resolveClientName = (prop: Proposal): string => {
     return (
-      prop.thirdparty?.name || 
-      prop.soc_name || 
-      prop.name || 
-      thirdPartiesMap[String(prop.socid)] || 
+      prop.thirdparty?.name ||
+      prop.soc_name ||
+      prop.name ||
+      thirdPartiesMap[String(prop.socid)] ||
       'Client inconnu'
     );
   };
+
+  const hasMore = proposals.length === PAGE_LIMIT;
 
   // --- Rendu ---
 
@@ -211,10 +219,14 @@ export default function CommercePage() {
       {/* En-tête */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-foreground text-2xl font-bold tracking-tight">Propositions commerciales</h1>
-          <p className="text-muted mt-2 text-sm">Gérez vos devis, consultez leurs dates de validité et leurs statuts.</p>
+          <h1 className="text-foreground text-2xl font-bold tracking-tight">
+            Propositions commerciales
+          </h1>
+          <p className="text-muted mt-2 text-sm">
+            Gérez vos devis, consultez leurs dates de validité et leurs statuts.
+          </p>
         </div>
-        <div className="mt-4 sm:ml-16 sm:mt-0">
+        <div className="mt-4 sm:mt-0 sm:ml-16">
           <button
             type="button"
             onClick={() => router.push('/commerce/create')}
@@ -233,7 +245,7 @@ export default function CommercePage() {
             placeholder="Chercher une référence ou un client..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset"
+            className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
           />
         </div>
         <div>
@@ -253,13 +265,13 @@ export default function CommercePage() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200 text-sm">
+        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
           {error}
         </div>
       )}
 
       {/* Liste des devis */}
-      <div className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm ring-1 ring-border/50">
+      <div className="border-border bg-surface ring-border/50 overflow-hidden rounded-xl border shadow-sm ring-1">
         <div className="overflow-x-auto">
           <table className="divide-border min-w-full divide-y">
             <thead className="bg-background">
@@ -309,7 +321,7 @@ export default function CommercePage() {
                     colSpan={6}
                     className="text-muted py-10 text-center text-sm"
                   >
-                    Mise à jour de la liste...
+                    Chargement...
                   </td>
                 </tr>
               ) : proposals.length === 0 ? (
@@ -353,31 +365,85 @@ export default function CommercePage() {
           </table>
         </div>
 
-        {/* Pagination bar */}
-        {!loading && (proposals.length >= PAGE_LIMIT || page > 1) && (
-          <div className="border-border flex items-center justify-between border-t bg-surface px-6 py-4">
-            <p className="text-sm text-muted">
-              Page <span className="font-bold text-foreground">{page}</span>
-              {totalItems > 0 && <span> sur {Math.ceil(totalItems / PAGE_LIMIT)}</span>}
+        {/* Pagination Style Facturation */}
+        <div className="border-border bg-surface flex items-center justify-between border-t px-4 py-3 sm:px-6">
+          {/* Desktop Version */}
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <p className="text-muted text-sm">
+              Page <span className="font-medium">{page + 1}</span>
+              {totalItems > 0 && (
+                <span>
+                  {' '}
+                  /{' '}
+                  <span className="font-medium">
+                    {Math.ceil(totalItems / PAGE_LIMIT)}
+                  </span>
+                </span>
+              )}
             </p>
-            <div className="flex gap-3">
+            <nav
+              className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+              aria-label="Pagination"
+            >
               <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="btn-secondary px-4 py-2 text-sm disabled:opacity-30"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0 || loading}
+                className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-l-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Précédent
+                <span className="sr-only">Précédent</span>
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </button>
               <button
-                onClick={() => setPage(p => p + 1)}
-                disabled={proposals.length < PAGE_LIMIT}
-                className="btn-secondary px-4 py-2 text-sm disabled:opacity-30"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasMore || loading}
+                className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-r-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Suivant
+                <span className="sr-only">Suivant</span>
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </button>
-            </div>
+            </nav>
           </div>
-        )}
+
+          {/* Mobile Version */}
+          <div className="flex flex-1 justify-between sm:hidden">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || loading}
+              className="border-border bg-surface text-foreground hover:bg-background relative inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              Précédent
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasMore || loading}
+              className="border-border bg-surface text-foreground hover:bg-background relative ml-3 inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

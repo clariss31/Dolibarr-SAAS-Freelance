@@ -56,13 +56,15 @@ export default function ThirdPartiesPage() {
       if (response.data && Array.isArray(response.data)) {
         setTiers(response.data);
         setHasMore(response.data.length === limit);
-        
+
         // Count from headers
         const total = response.headers?.get('X-Total-Count');
         if (total) {
           setTotalItems(parseInt(total, 10));
         } else {
-          setTotalItems(response.data.length + (response.data.length === limit ? limit : 0));
+          setTotalItems(
+            response.data.length + (response.data.length === limit ? limit : 0)
+          );
         }
       } else {
         setTiers([]);
@@ -274,12 +276,14 @@ export default function ThirdPartiesPage() {
           <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
             <div>
               <p className="text-muted text-sm">
-                Affichage de la page{' '}
-                <span className="font-medium">{page + 1}</span>
+                Page <span className="font-medium">{page + 1}</span>
                 {totalItems > 0 && (
                   <>
                     {' '}
-                    / <span className="font-medium">{Math.ceil(totalItems / limit)}</span>
+                    /{' '}
+                    <span className="font-medium">
+                      {Math.ceil(totalItems / limit)}
+                    </span>
                   </>
                 )}
               </p>
