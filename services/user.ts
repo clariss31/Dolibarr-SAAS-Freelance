@@ -1,59 +1,80 @@
 /**
- * Service de récupération du profil utilisateur courant.
- * Stratégie de repli :
- *   1. Tentative via GET /users/info
- *   2. Si 404, tentative via GET /users/login/{login} (login extrait du cookie de session)
+ * @file services/user.ts
+ * 
+ * Service de gestion du profil utilisateur et de son identité.
+ * 
+ * Ce module gère la persistance du login utilisateur via des cookies pour faciliter 
+ * la récupération de son profil complet via l'API Dolibarr.
+ * 
+ * Stratégie de récupération du profil :
+ * 1. Tentative via `GET /users/info` (méthode standard recommandée).
+ * 2. Repli (Fallback) : Si `/users/info` échoue (souvent dû à des restrictions 
+ *    de permissions sur certaines versions), le service utilise le login 
+ *    mémorisé dans les cookies pour appeler `GET /users/login/{login}`.
  */
+
+import Cookies from 'js-cookie';
 import { api } from './api';
 import { User } from '../types/dolibarr';
 
+/** Clé utilisée pour stocker le login dans les cookies. */
+const LOGIN_COOKIE_KEY = 'dolibarr_login';
+
 /**
- * Récupère le login stocké dans le cookie de session.
- * L'API Dolibarr retourne le login dans la réponse de connexion ;
- * on le persiste lors du login pour permettre le repli.
+ * Service pour les opérations liées aux utilisateurs Dolibarr.
  */
-const LOGIN_KEY = 'dolibarr_login';
-
 export const userService = {
-  /** Mémorise le login après authentification */
-  saveLogin(login: string) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(LOGIN_KEY, login);
-    }
-  },
-
-  /** Retourne le login mémorisé ou null */
-  getSavedLogin(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(LOGIN_KEY);
-    }
-    return null;
-  },
-
-  /** Supprime le login mémorisé (lors de la déconnexion) */
-  clearLogin() {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(LOGIN_KEY);
-    }
+  /**
+   * Mémorise le login de l'utilisateur dans un cookie après une authentification réussie.
+   * Utilisé pour le mécanisme de repli lors de la récupération du profil.
+   * 
+   * @param login - Identifiant de l'utilisateur (login Dolibarr).
+   */
+  saveLogin(login: string): void {
+    Cookies.set(LOGIN_COOKIE_KEY, login, {
+      expires: 7,
+      secure: true,
+      sameSite: 'lax',
+    });
   },
 
   /**
-   * Récupère le profil de l'utilisateur connecté.
-   * Tentative A : GET /users/info
-   * Tentative B : GET /users/login/{login} si le login est disponible
+   * Récupère le login mémorisé depuis les cookies.
+   * 
+   * @returns Le login ou undefined s'il n'est pas trouvé.
+   */
+  getSavedLogin(): string | undefined {
+    return Cookies.get(LOGIN_COOKIE_KEY);
+  },
+
+  /**
+   * Supprime le login mémorisé. 
+   * Doit être appelé lors de la déconnexion de l'utilisateur.
+   */
+  clearLogin(): void {
+    Cookies.remove(LOGIN_COOKIE_KEY);
+  },
+
+  /**
+   * Récupère le profil complet de l'utilisateur actuellement connecté.
+   * 
+   * Met en œuvre une double tentative (standard puis repli par login)
+   * pour maximiser les chances de succès selon les réglages de l'instance Dolibarr.
+   * 
+   * @returns Le profil de l'utilisateur (User) ou null en cas d'échec total.
    */
   async getCurrentUser(): Promise<User | null> {
-    // Tentative A : /users/info
+    // --- Tentative A : Endpoint standard /users/info ---
     try {
       const response = await api.get('/users/info');
       if (response.data) {
         return response.data as User;
       }
-    } catch {
-      // Continuer vers la tentative B
+    } catch (error) {
+      // Échec silencieux, on tente la méthode de repli
     }
 
-    // Tentative B : /users/login/{login}
+    // --- Tentative B : Endpoint de repli via le login sauvegardé ---
     const savedLogin = this.getSavedLogin();
     if (savedLogin) {
       try {
@@ -61,8 +82,8 @@ export const userService = {
         if (response.data) {
           return response.data as User;
         }
-      } catch {
-        // Échec silencieux
+      } catch (error) {
+        // Échec définitif
       }
     }
 
