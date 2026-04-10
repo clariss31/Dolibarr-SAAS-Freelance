@@ -1,102 +1,170 @@
 'use client';
 
+/**
+ * @file billing-payments/create/page.tsx
+ *
+ * Page de création d'une facture (client ou fournisseur).
+ *
+ * Architecture Next.js App Router :
+ * - `CreateInvoicePage` est le composant par défaut exporté (Server Component compatible).
+ *   Il enveloppe `CreateInvoiceForm` dans un `<Suspense>`, requis car ce formulaire
+ *   utilise `useSearchParams()` qui nécessite un contexte client.
+ * - `CreateInvoiceForm` contient toute la logique métier et l'interface.
+ *
+ * Fonctionnement :
+ * 1. Lecture du paramètre `?type=client|supplier` pour pré-sélectionner le type de facture.
+ * 2. Chargement de la liste des tiers filtrée selon le type (clients ou fournisseurs).
+ * 3. Soumission via POST /invoices ou POST /supplierinvoices avec les lignes intégrées.
+ * 4. Redirection vers la page de détail de la facture créée.
+ */
+
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
-import { ApiError } from '../../../../types/dolibarr';
-import ProposalLines, {
-  LocalLine,
-} from '../../../../components/ui/ProposalLines';
+import ProposalLines, { LocalLine } from '../../../../components/ui/ProposalLines';
 
+// ---------------------------------------------------------------------------
+// Types locaux
+// ---------------------------------------------------------------------------
+
+/** Type de facture pris en charge par cette page. */
 type InvoiceType = 'client' | 'supplier';
 
+/** Forme minimale d'un tiers retourné par GET /thirdparties. */
 interface ThirdPartyOption {
   id: string;
+  /** Nom retourné selon la version de l'API (name ou nom). */
   name?: string;
   nom?: string;
 }
 
-export default function CreateInvoicePage() {
-  return (
-    <Suspense fallback={<p>Chargement...</p>}>
-      <CreateInvoiceForm />
-    </Suspense>
-  );
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convertit une chaîne `YYYY-MM-DD` en timestamp Unix (secondes).
+ * Retourne `null` si la chaîne est absente.
+ */
+function dateStringToTimestamp(dateStr: string): number | null {
+  if (!dateStr) return null;
+  return Math.floor(new Date(dateStr).getTime() / 1000);
 }
 
+/** Calcule la date d'aujourd'hui au format `YYYY-MM-DD`. */
+function getToday(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+/** Calcule la date dans N jours au format `YYYY-MM-DD`. */
+function getDateInDays(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+}
+
+// ---------------------------------------------------------------------------
+// Composant formulaire (client component)
+// ---------------------------------------------------------------------------
+
+/**
+ * Formulaire de création de facture.
+ *
+ * Ce composant est séparé de `CreateInvoicePage` pour respecter la contrainte
+ * Next.js App Router : `useSearchParams()` doit être dans un composant enfant d'un `<Suspense>`.
+ */
 function CreateInvoiceForm() {
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  const initialType = (searchParams.get('type') as InvoiceType) || 'client';
 
-  const today = new Date().toISOString().split('T')[0];
-  const thirtyDaysLater = new Date();
-  thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-  const defaultDatelimit = thirtyDaysLater.toISOString().split('T')[0];
+  /** Type initial lu depuis l'URL (?type=client|supplier), par défaut 'client'. */
+  const initialType = (searchParams.get('type') as InvoiceType) ?? 'client';
 
-  // Type de facture : client ou fournisseur
-  // Type de facture : client ou fournisseur
+  // --- État du type de facture ---
   const [invoiceType, setInvoiceType] = useState<InvoiceType>(initialType);
 
+  // --- État du formulaire ---
   const [formData, setFormData] = useState({
-    socid: '',
-    date: today,
-    datelimit: defaultDatelimit,
+    socid:     '',
+    date:      getToday(),
+    datelimit: getDateInDays(30),
   });
 
+  // --- État des lignes ---
   const [lines, setLines] = useState<LocalLine[]>([]);
-  const [thirdParties, setThirdParties] = useState<ThirdPartyOption[]>([]);
+
+  // --- État des tiers ---
+  const [thirdParties,        setThirdParties]        = useState<ThirdPartyOption[]>([]);
   const [loadingThirdParties, setLoadingThirdParties] = useState(true);
+
+  // --- État UI ---
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error,  setError]  = useState('');
 
-  const dateStringToTimestamp = (dateStr: string) => {
-    if (!dateStr) return null;
-    return Math.floor(new Date(dateStr).getTime() / 1000);
-  };
+  // ---------------------------------------------------------------------------
+  // Chargement des tiers
+  // ---------------------------------------------------------------------------
 
-  // Recharge la liste des tiers selon le type sélectionné
-  // Clients (client=1 ou client=3) vs Fournisseurs (fournisseur=1)
+  /**
+   * Charge la liste des tiers filtrée selon le type de facture.
+   * - client    → client > 0 (clients et prospects)
+   * - supplier  → fournisseur = 1
+   *
+   * Silencieux en cas d'erreur : le select affichera simplement vide.
+   */
   const fetchThirdParties = useCallback(async (type: InvoiceType) => {
     setLoadingThirdParties(true);
     setThirdParties([]);
-    // Reset du tiers sélectionné à chaque changement de type
+    // Réinitialisation du tiers sélectionné lors du changement de type
     setFormData((prev) => ({ ...prev, socid: '' }));
+
     try {
       const filter =
         type === 'client'
           ? 'sqlfilters=(t.client:>:0)'
           : 'sqlfilters=(t.fournisseur:=:1)';
+
       const response = await api.get(
         `/thirdparties?sortfield=t.nom&sortorder=ASC&limit=500&${filter}`
       );
-      if (response.data && Array.isArray(response.data)) {
+
+      if (Array.isArray(response.data)) {
         setThirdParties(response.data);
       }
     } catch {
-      // Silecieux — le select affichera "aucun tiers"
+      // Erreur silencieuse — le select affichera «aucun tiers»
     } finally {
       setLoadingThirdParties(false);
     }
   }, []);
 
+  /** Recharge la liste des tiers à chaque changement de type de facture. */
   useEffect(() => {
     fetchThirdParties(invoiceType);
   }, [invoiceType, fetchThirdParties]);
 
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+
+  /** Met à jour un champ du formulaire. */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleInvoiceTypeChange = (type: InvoiceType) => {
-    setInvoiceType(type);
-  };
-
+  /**
+   * Crée la facture via POST /invoices ou POST /supplierinvoices.
+   *
+   * Les lignes sont transmises directement dans le corps du POST (contrairement
+   * à la mise à jour, elles sont acceptées à la création par l'API Dolibarr).
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation minimaliste côté client
     if (!formData.socid) {
       setError('Veuillez sélectionner un tiers.');
       return;
@@ -105,32 +173,35 @@ function CreateInvoiceForm() {
     setSaving(true);
     setError('');
 
-    const endpoint =
-      invoiceType === 'supplier' ? '/supplierinvoices' : '/invoices';
+    const endpoint = invoiceType === 'supplier' ? '/supplierinvoices' : '/invoices';
 
     const payload = {
-      socid: parseInt(formData.socid, 10),
-      date: dateStringToTimestamp(formData.date),
+      socid:     parseInt(formData.socid, 10),
+      date:      dateStringToTimestamp(formData.date),
       datelimit: dateStringToTimestamp(formData.datelimit),
       lines: lines.map((line) => ({
-        fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
+        fk_product:   line.fk_product ? parseInt(line.fk_product, 10) : 0,
         product_type: line.product_type,
-        desc: line.label,
-        qty: Number(line.qty),
-        subprice: Number(line.subprice),
-        tva_tx: Number(line.tva_tx),
+        desc:         line.label,
+        qty:          Number(line.qty),
+        subprice:     Number(line.subprice),
+        tva_tx:       Number(line.tva_tx),
       })),
     };
 
     try {
       const response = await api.post(endpoint, payload);
-      const newInvoiceId = response.data as string | number;
-      router.push(`/billing-payments/${newInvoiceId}?type=${invoiceType}`);
+      const newId = response.data as string | number;
+      router.push(`/billing-payments/${newId}?type=${invoiceType}`);
     } catch (err: unknown) {
       setError(getErrorMessage(err));
       setSaving(false);
     }
   };
+
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="space-y-8">
@@ -138,8 +209,7 @@ function CreateInvoiceForm() {
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            Nouvelle facture{' '}
-            {invoiceType === 'client' ? 'client' : 'fournisseur'}
+            Nouvelle facture {invoiceType === 'client' ? 'client' : 'fournisseur'}
           </h1>
           <p className="text-muted mt-1 text-sm">
             Créez une nouvelle facture en brouillon.
@@ -154,46 +224,49 @@ function CreateInvoiceForm() {
         </button>
       </div>
 
+      {/* Message d'erreur */}
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset">
+        <div
+          className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-inset ring-red-600/20"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
+      {/* Formulaire */}
       <form
         onSubmit={handleSubmit}
         className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
       >
         <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-          {/* Type de facture + Sélecteur de tiers — sur la même ligne */}
+
+          {/* Type de facture + sélecteur de tiers sur la même ligne */}
           <div className="sm:col-span-2">
             <span className="text-foreground block text-sm leading-6 font-medium">
               Type de facture &amp; Tiers *
             </span>
             <div className="mt-2 flex gap-3">
-              {/* Sélecteur Client / Fournisseur */}
+
+              {/* Bascule Client / Fournisseur */}
               <fieldset aria-label="Type de facture">
                 <div className="flex h-full overflow-hidden rounded-md ring-1 ring-[var(--color-border)] ring-inset">
                   <button
                     type="button"
-                    onClick={() => handleInvoiceTypeChange('client')}
+                    onClick={() => setInvoiceType('client')}
                     aria-pressed={invoiceType === 'client'}
                     className={`focus-visible:outline-primary px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                      invoiceType === 'client'
-                        ? 'bg-primary text-background'
-                        : 'text-muted'
+                      invoiceType === 'client' ? 'bg-primary text-background' : 'text-muted'
                     }`}
                   >
                     Client
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleInvoiceTypeChange('supplier')}
+                    onClick={() => setInvoiceType('supplier')}
                     aria-pressed={invoiceType === 'supplier'}
                     className={`border-border focus-visible:outline-primary border-l px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                      invoiceType === 'supplier'
-                        ? 'bg-primary text-background'
-                        : 'text-muted'
+                      invoiceType === 'supplier' ? 'bg-primary text-background' : 'text-muted'
                     }`}
                   >
                     Fournisseur
@@ -203,10 +276,9 @@ function CreateInvoiceForm() {
 
               {/* Select du tiers — prend le reste de la largeur */}
               <div className="flex-1">
+                {/* Label masqué visuellement mais accessible aux lecteurs d'écran */}
                 <label htmlFor="socid" className="sr-only">
-                  {invoiceType === 'client'
-                    ? 'Sélectionner un client'
-                    : 'Sélectionner un fournisseur'}
+                  {invoiceType === 'client' ? 'Sélectionner un client' : 'Sélectionner un fournisseur'}
                 </label>
                 <select
                   id="socid"
@@ -226,7 +298,7 @@ function CreateInvoiceForm() {
                   </option>
                   {thirdParties.map((tier) => (
                     <option key={tier.id} value={tier.id}>
-                      {tier.name || tier.nom}
+                      {tier.name ?? tier.nom}
                     </option>
                   ))}
                 </select>
@@ -255,7 +327,7 @@ function CreateInvoiceForm() {
             </div>
           </div>
 
-          {/* Date limite / Échéance */}
+          {/* Date d'échéance (30 jours par défaut) */}
           <div>
             <label
               htmlFor="datelimit"
@@ -276,9 +348,10 @@ function CreateInvoiceForm() {
           </div>
         </div>
 
-        {/* Lignes de produits / services */}
+        {/* Lignes de la facture */}
         <ProposalLines lines={lines} onChange={setLines} />
 
+        {/* Actions */}
         <div className="border-border flex items-center justify-end border-t pt-6">
           <button
             type="submit"
@@ -290,5 +363,32 @@ function CreateInvoiceForm() {
         </div>
       </form>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Export par défaut (Next.js App Router)
+// ---------------------------------------------------------------------------
+
+/**
+ * Point d'entrée de la route `/billing-payments/create`.
+ *
+ * Enveloppe `CreateInvoiceForm` dans un `<Suspense>` pour satisfaire la
+ * contrainte Next.js App Router : tout composant utilisant `useSearchParams()`
+ * doit être enfant d'un `<Suspense>`, faute de quoi le build échoue.
+ *
+ * @see https://nextjs.org/docs/app/api-reference/functions/use-search-params#static-rendering
+ */
+export default function CreateInvoicePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-muted flex items-center justify-center py-20 text-sm">
+          Chargement...
+        </div>
+      }
+    >
+      <CreateInvoiceForm />
+    </Suspense>
   );
 }

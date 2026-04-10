@@ -1,226 +1,336 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * @file billing-payments/page.tsx
+ *
+ * Page de liste des factures (clients et fournisseurs).
+ *
+ * Fonctionnement :
+ * - Deux onglets switchent entre factures clients (`/invoices`) et
+ *   fournisseurs (`/supplierinvoices`).
+ * - Un mapping des tiers est préchargé au montage pour résoudre les noms
+ *   des tiers absents des données de facture (clé = socid, valeur = nom).
+ * - La recherche est debouncée (400 ms) pour limiter les appels API.
+ * - La pagination est gérée côté serveur via les paramètres `page` et `limit`.
+ * - Le total est lu dans l'en-tête HTTP `X-Total-Count` (avec fallback).
+ */
+
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
 import { getErrorMessage } from '../../../utils/error-handler';
 import { Invoice, ApiError } from '../../../types/dolibarr';
 
+// ---------------------------------------------------------------------------
+// Constantes
+// ---------------------------------------------------------------------------
+
+/** Nombre de factures par page. */
+const PAGE_LIMIT = 10;
+
+/** Délai de debounce pour la recherche (en millisecondes). */
+const SEARCH_DEBOUNCE_MS = 400;
+
+// ---------------------------------------------------------------------------
+// Types locaux
+// ---------------------------------------------------------------------------
+
+/** Onglet actif : factures clients ou fournisseurs. */
+type InvoiceTab = 'client' | 'supplier';
+
+// ---------------------------------------------------------------------------
+// Helpers purs
+// ---------------------------------------------------------------------------
+
+/**
+ * Formate un montant en euros avec la locale française.
+ * Retourne '-' si la valeur est absente ou invalide.
+ */
+function formatCurrency(amount: string | number | undefined): string {
+  if (amount === undefined || amount === null || amount === '') return '-';
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(Number(amount));
+}
+
+/**
+ * Formate un timestamp Dolibarr (secondes Unix ou chaîne ISO) en date lisible `dd/mm/yyyy`.
+ * Retourne '-' si la valeur est absente ou invalide.
+ */
+function formatDate(timestamp: number | string | undefined): string {
+  if (!timestamp) return '-';
+
+  // Déjà au format ISO (YYYY-MM-DD ou YYYY-MM-DD HH:mm:ss)
+  if (typeof timestamp === 'string' && timestamp.includes('-')) {
+    return new Intl.DateTimeFormat('fr-FR').format(new Date(timestamp));
+  }
+
+  const numTs = Number(timestamp);
+  if (isNaN(numTs)) return '-';
+
+  // Dolibarr retourne des secondes ; on détecte les millisecondes (> 10 chiffres)
+  const ms = numTs < 10_000_000_000 ? numTs * 1000 : numTs;
+  return new Intl.DateTimeFormat('fr-FR').format(new Date(ms));
+}
+
+/**
+ * Détermine si une facture est en retard de paiement.
+ * Critères : statut = 1 (impayée) ET date d'échéance dépassée.
+ */
+function isOverdue(invoice: Invoice): boolean {
+  if (Number(invoice.statut) !== 1) return false;
+
+  const limitRaw =
+    invoice.datelimit ?? invoice.date_lim_reglement ?? invoice.date_echeance;
+  if (!limitRaw) return false;
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  let limitSeconds = 0;
+
+  if (typeof limitRaw === 'string' && limitRaw.includes('-')) {
+    const ms = new Date(limitRaw).getTime();
+    if (!isNaN(ms)) limitSeconds = Math.floor(ms / 1000);
+  } else {
+    const raw = Number(limitRaw);
+    // Normalisation : secondes si retourné en millisecondes
+    limitSeconds = raw > 10_000_000_000 ? Math.floor(raw / 1000) : raw;
+  }
+
+  return limitSeconds > 0 && limitSeconds < nowSeconds;
+}
+
+// ---------------------------------------------------------------------------
+// Composants de présentation
+// ---------------------------------------------------------------------------
+
+/** Badge coloré représentant le statut d'une facture Dolibarr. */
+function StatusBadge({ invoice }: { invoice: Invoice }) {
+  switch (Number(invoice.statut)) {
+    case 0:
+      return (
+        <span className="inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-500/10 ring-inset">
+          Brouillon
+        </span>
+      );
+    case 1:
+      // Statut 1 = validée (impayée ou partiellement payée)
+      return (
+        <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-600/20 ring-inset">
+          Impayée
+        </span>
+      );
+    case 2:
+      return (
+        <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
+          Payée
+        </span>
+      );
+    case 3:
+      return (
+        <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset">
+          Abandonnée
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 ring-inset">
+          Inconnu
+        </span>
+      );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Composant principal
+// ---------------------------------------------------------------------------
+
+/**
+ * Page listant les factures clients et fournisseurs.
+ *
+ * Gère : la navigation par onglets, la recherche debouncée, le filtre par statut,
+ * la pagination serveur et l'affichage du nom des tiers via un dictionnaire préchargé.
+ */
 export default function BillingPaymentsPage() {
   const router = useRouter();
 
-  // Tabs state
-  const [activeTab, setActiveTab] = useState<'client' | 'supplier'>('client');
+  // --- Onglet actif ---
+  const [activeTab, setActiveTab] = useState<InvoiceTab>('client');
 
-  // Data state
+  // --- Données ---
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  /** Dictionnaire socid → nom du tiers, préchargé au montage. */
   const [thirdPartiesMap, setThirdPartiesMap] = useState<
     Record<string, string>
   >({});
+
+  // --- État de chargement ---
   const [loading, setLoading] = useState(true);
   const [loadingThirdParties, setLoadingThirdParties] = useState(true);
   const [error, setError] = useState('');
 
-  // Pagination state
+  // --- Pagination ---
   const [page, setPage] = useState(0);
-  const limit = 10;
   const [hasMore, setHasMore] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Filtres
+  // --- Filtres ---
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Charger le mapping des tiers une seule fois au montage
+  // ---------------------------------------------------------------------------
+  // Préchargement du dictionnaire des tiers
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
+    /**
+     * Charge tous les tiers (jusqu'à 1000) pour construire un dictionnaire
+     * id → nom, utilisé pour résoudre le nom affiché dans le tableau quand
+     * la réponse de l'API facture ne l'inclut pas.
+     */
     api
       .get('/thirdparties?limit=1000')
       .then((res) => {
-        if (res.data) {
-          const dict: Record<string, string> = {};
-          res.data.forEach((t: any) => {
-            dict[String(t.id)] = t.name || t.nom || t.soc_name;
-          });
-          setThirdPartiesMap(dict);
-        }
+        if (!Array.isArray(res.data)) return;
+
+        const dict: Record<string, string> = {};
+        (
+          res.data as Array<{
+            id: string | number;
+            name?: string;
+            nom?: string;
+            soc_name?: string;
+          }>
+        ).forEach((t) => {
+          dict[String(t.id)] = t.name ?? t.nom ?? t.soc_name ?? '';
+        });
+
+        setThirdPartiesMap(dict);
       })
-      .catch((err) => console.error('Could not preload third parties', err))
+      .catch((err) =>
+        console.error('Impossible de précharger les tiers :', err)
+      )
       .finally(() => setLoadingThirdParties(false));
   }, []);
 
-  // Debounce search input
+  // ---------------------------------------------------------------------------
+  // Debounce de la recherche
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
-    const handler = setTimeout(() => {
+    const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-    }, 400);
-    return () => clearTimeout(handler);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const fetchInvoices = async (currentPage: number) => {
-    setLoading(true);
-    setError('');
-    try {
-      const endpoint =
-        activeTab === 'client' ? '/invoices' : '/supplierinvoices';
-      let query = `${endpoint}?sortfield=t.rowid&sortorder=DESC&limit=${limit}&page=${currentPage}`;
-      const conditions: string[] = [];
+  // ---------------------------------------------------------------------------
+  // Réinitialisation de la page lors d'un changement de filtre
+  // ---------------------------------------------------------------------------
 
-      if (statusFilter !== 'all') {
-        const field = activeTab === 'supplier' ? 't.fk_statut' : 't.fk_statut';
-        conditions.push(`(${field}:=:${statusFilter})`);
-      }
-
-      if (debouncedSearch) {
-        const cleanTerm = debouncedSearch.replace(/'/g, "''");
-        // Recherche sur REF et nom du tiers (s.nom pour Dolibarr)
-        conditions.push(
-          `((t.ref:like:'%${cleanTerm}%') OR (s.nom:like:'%${cleanTerm}%'))`
-        );
-      }
-
-      if (conditions.length > 0) {
-        query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
-      }
-
-      const response = await api.get(query);
-
-      if (response.data && Array.isArray(response.data)) {
-        setInvoices(response.data);
-        setHasMore(response.data.length === limit);
-
-        // Get total count from headers
-        const total = response.headers?.get('X-Total-Count');
-        if (total) {
-          setTotalItems(parseInt(total, 10));
-        } else {
-          // Fallback if header missing but we have items
-          setTotalItems(response.data.length + (response.data.length === limit ? limit : 0));
-        }
-      } else {
-        setInvoices([]);
-        setHasMore(false);
-        setTotalItems(0);
-      }
-    } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      if (apiErr.response?.status === 404) {
-        // 404 means no records found for these filters/page
-        setInvoices([]);
-        setHasMore(false);
-      } else {
-        setError(getErrorMessage(err));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch when page, tab or search changes
-  useEffect(() => {
-    fetchInvoices(page);
-  }, [page, activeTab, debouncedSearch, statusFilter]);
-
-  // Reset page to 0 when tab or search changes
   useEffect(() => {
     setPage(0);
   }, [activeTab, debouncedSearch, statusFilter]);
 
-  // Utility to format numbers into currency
-  const formatCurrency = (amount: string | number | undefined) => {
-    if (amount === undefined || amount === null || amount === '') return '-';
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(Number(amount));
-  };
+  // ---------------------------------------------------------------------------
+  // Chargement des factures
+  // ---------------------------------------------------------------------------
 
-  // Utility to format timestamps/dates
-  const formatDate = (timestamp: number | string | undefined) => {
-    if (!timestamp) return '-';
+  /**
+   * Charge une page de factures en appliquant les filtres actifs.
+   *
+   * Stratégie pour le total :
+   * 1. Lecture de l'en-tête HTTP `X-Total-Count` (présent sur les versions récentes).
+   * 2. Fallback estimatif si l'en-tête est absent.
+   *
+   * Gestion des erreurs :
+   * - 404 est considéré comme «aucun résultat» (Dolibarr retourne 404 quand la page est vide).
+   * - Toute autre erreur est affichée dans l'interface.
+   */
+  const fetchInvoices = useCallback(
+    async (currentPage: number) => {
+      setLoading(true);
+      setError('');
 
-    // Si c'est une string ISO (ex: 2024-03-15)
-    if (typeof timestamp === 'string' && timestamp.includes('-')) {
-      const date = new Date(timestamp);
-      return new Intl.DateTimeFormat('fr-FR').format(date);
-    }
+      try {
+        const endpoint =
+          activeTab === 'client' ? '/invoices' : '/supplierinvoices';
+        const conditions: string[] = [];
 
-    const numTs = Number(timestamp);
-    if (isNaN(numTs)) return '-';
+        // Filtre par statut
+        if (statusFilter !== 'all') {
+          conditions.push(`(t.fk_statut:=:${statusFilter})`);
+        }
 
-    // Dolibarr renvoie souvent le timestamp en secondes
-    const ms = numTs < 10000000000 ? numTs * 1000 : numTs;
-    return new Intl.DateTimeFormat('fr-FR').format(new Date(ms));
-  };
+        // Recherche sur la référence et le nom du tiers
+        if (debouncedSearch) {
+          const safe = debouncedSearch.replace(/'/g, "''"); // échappement SQL
+          conditions.push(
+            `((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`
+          );
+        }
 
-  /** Vérifie si une facture est en retard (date d'échéance dépassée et impayée) */
-  const checkOverdue = (invoice: Invoice) => {
-    if (Number(invoice.statut) !== 1) return false; // Uniquement pour les factures impayées/validées
+        let query = `${endpoint}?sortfield=t.rowid&sortorder=DESC&limit=${PAGE_LIMIT}&page=${currentPage}`;
+        if (conditions.length > 0) {
+          query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
+        }
 
-    const limitStr = invoice.datelimit || invoice.date_lim_reglement || invoice.date_echeance;
-    if (!limitStr) return false;
+        const response = await api.get(query);
 
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    let parsedTs = 0;
+        if (!Array.isArray(response.data)) {
+          setInvoices([]);
+          setHasMore(false);
+          setTotalItems(0);
+          return;
+        }
 
-    if (typeof limitStr === 'string' && limitStr.includes('-')) {
-      const millis = new Date(limitStr).getTime();
-      if (!isNaN(millis)) {
-        parsedTs = Math.floor(millis / 1000);
+        setInvoices(response.data);
+        setHasMore(response.data.length === PAGE_LIMIT);
+
+        // Total : header HTTP ou estimation
+        const rawTotal = response.headers?.get('X-Total-Count');
+        if (rawTotal) {
+          setTotalItems(parseInt(rawTotal, 10));
+        } else {
+          const estimated =
+            response.data.length +
+            (response.data.length === PAGE_LIMIT ? PAGE_LIMIT : 0);
+          setTotalItems(estimated);
+        }
+      } catch (err: unknown) {
+        const apiErr = err as Error & ApiError;
+        if (apiErr.response?.status === 404) {
+          // 404 = page vide pour Dolibarr, pas une vraie erreur
+          setInvoices([]);
+          setHasMore(false);
+        } else {
+          setError(getErrorMessage(err));
+        }
+      } finally {
+        setLoading(false);
       }
-    } else {
-      parsedTs = Number(limitStr);
-      if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
-    }
+    },
+    [activeTab, debouncedSearch, statusFilter]
+  );
 
-    return parsedTs > 0 && parsedTs < nowSeconds;
-  };
+  /** Recharge les factures à chaque changement de page ou de filtre. */
+  useEffect(() => {
+    fetchInvoices(page);
+  }, [page, fetchInvoices]);
 
-  // Badge pour l'état avec couleurs accessibles
-  const getStatusBadge = (invoice: Invoice) => {
-    const status = Number(invoice.statut);
-
-    switch (status) {
-      case 0:
-        return (
-          <span className="inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-500/10 ring-inset">
-            Brouillon
-          </span>
-        );
-      case 1:
-        // Dans Dolibarr, l'état 1 est validée (impayée ou partiellement payée)
-        return (
-          <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-600/20 ring-inset">
-            Impayée
-          </span>
-        );
-      case 2:
-        return (
-          <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
-            Payée
-          </span>
-        );
-      case 3:
-        return (
-          <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset">
-            Abandonnée
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10 ring-inset">
-            Inconnu
-          </span>
-        );
-    }
-  };
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="space-y-6">
+      {/* En-tête */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            Facturation & Paiements
+            Facturation &amp; Paiements
           </h1>
           <p className="text-muted mt-2 text-sm">
             Suivi des factures, paiements et encours
@@ -237,6 +347,7 @@ export default function BillingPaymentsPage() {
         </div>
       </div>
 
+      {/* Message d'erreur */}
       {error && (
         <div
           className="rounded-md bg-red-50 p-4 dark:bg-red-900/30"
@@ -248,34 +359,38 @@ export default function BillingPaymentsPage() {
         </div>
       )}
 
-      {/* Tabs Switcher */}
+      {/* Onglets Client / Fournisseur */}
       <div className="border-border border-b">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => setActiveTab('client')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ${
-              activeTab === 'client'
-                ? 'border-primary text-primary'
-                : 'text-muted hover:text-foreground border-transparent hover:border-gray-300'
-            } `}
-          >
-            Factures clients
-          </button>
-          <button
-            onClick={() => setActiveTab('supplier')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ${
-              activeTab === 'supplier'
-                ? 'border-primary text-primary'
-                : 'text-muted hover:text-foreground border-transparent hover:border-gray-300'
-            } `}
-          >
-            Factures fournisseurs
-          </button>
+        <nav
+          className="-mb-px flex space-x-8"
+          aria-label="Onglets de facturation"
+        >
+          {(
+            [
+              { key: 'client', label: 'Factures clients' },
+              { key: 'supplier', label: 'Factures fournisseurs' },
+            ] as const
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              aria-selected={activeTab === key}
+              role="tab"
+              className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ${
+                activeTab === key
+                  ? 'border-primary text-primary'
+                  : 'text-muted hover:text-foreground border-transparent hover:border-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </nav>
       </div>
 
-      {/* Filters Bar */}
+      {/* Barre de filtres */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
+        {/* Recherche */}
         <div className="flex-1">
           <label htmlFor="search" className="sr-only">
             Rechercher
@@ -289,6 +404,8 @@ export default function BillingPaymentsPage() {
             className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
           />
         </div>
+
+        {/* Filtre par statut */}
         <div className="sm:flex-none">
           <label htmlFor="status" className="sr-only">
             État
@@ -308,7 +425,7 @@ export default function BillingPaymentsPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Tableau */}
       <div className="border-border bg-surface ring-border/50 overflow-hidden rounded-lg border shadow-sm ring-1">
         <div className="overflow-x-auto">
           <table className="divide-border min-w-full divide-y">
@@ -378,125 +495,137 @@ export default function BillingPaymentsPage() {
                   </td>
                 </tr>
               ) : (
-                invoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    onClick={() =>
-                      router.push(
-                        `/billing-payments/${invoice.id}?type=${activeTab}`
-                      )
-                    }
-                    className="hover:bg-background/80 cursor-pointer transition-colors"
-                  >
-                    <td className="text-foreground py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap sm:pl-6">
-                      {invoice.ref}
-                    </td>
-                    <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
-                      {formatDate(invoice.date)}
-                    </td>
-                    <td
-                      className={`px-3 py-4 text-sm whitespace-nowrap ${
-                        checkOverdue(invoice)
-                          ? 'text-red-600 font-semibold dark:text-red-400'
-                          : 'text-muted'
-                      }`}
+                invoices.map((invoice) => {
+                  // Résolution du nom du tiers : payload API en priorité, puis dictionnaire préchargé
+                  const tierName =
+                    invoice.thirdparty?.name ??
+                    invoice.soc_name ??
+                    invoice.nom ??
+                    thirdPartiesMap[String(invoice.socid)] ??
+                    '-';
+
+                  // Date d'échéance — plusieurs noms de champ selon la version Dolibarr
+                  const dueDate =
+                    invoice.datelimit ??
+                    invoice.date_lim_reglement ??
+                    invoice.date_echeance;
+                  const overdue = isOverdue(invoice);
+
+                  return (
+                    <tr
+                      key={invoice.id}
+                      onClick={() =>
+                        router.push(
+                          `/billing-payments/${invoice.id}?type=${activeTab}`
+                        )
+                      }
+                      className="hover:bg-background/80 cursor-pointer transition-colors"
                     >
-                      {formatDate(
-                        invoice.datelimit ||
-                          invoice.date_lim_reglement ||
-                          invoice.date_echeance
-                      )}
-                      {checkOverdue(invoice) && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                          RETARD
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
-                      {invoice.thirdparty?.name ||
-                        invoice.soc_name ||
-                        invoice.nom ||
-                        thirdPartiesMap[String(invoice.socid)] ||
-                        '-'}
-                    </td>
-                    <td className="text-foreground px-3 py-4 text-right text-sm font-medium whitespace-nowrap">
-                      {formatCurrency(invoice.total_ht)}
-                    </td>
-                    <td className="text-foreground px-3 py-4 text-right text-sm font-medium whitespace-nowrap">
-                      {formatCurrency(invoice.total_ttc)}
-                    </td>
-                    <td className="px-3 py-4 text-center text-sm whitespace-nowrap">
-                      {getStatusBadge(invoice)}
-                    </td>
-                  </tr>
-                ))
+                      {/* Référence */}
+                      <td className="text-foreground py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap sm:pl-6">
+                        {invoice.ref}
+                      </td>
+                      {/* Date de facturation */}
+                      <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
+                        {formatDate(invoice.date)}
+                      </td>
+                      {/* Date d'échéance avec indicateur de retard */}
+                      <td
+                        className={`px-3 py-4 text-sm whitespace-nowrap ${overdue ? 'font-semibold text-red-600 dark:text-red-400' : 'text-muted'}`}
+                      >
+                        {formatDate(dueDate)}
+                        {overdue && (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                            RETARD
+                          </span>
+                        )}
+                      </td>
+                      {/* Tiers */}
+                      <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
+                        {tierName}
+                      </td>
+                      {/* Montant HT */}
+                      <td className="text-foreground px-3 py-4 text-right text-sm font-medium whitespace-nowrap">
+                        {formatCurrency(invoice.total_ht)}
+                      </td>
+                      {/* Montant TTC */}
+                      <td className="text-foreground px-3 py-4 text-right text-sm font-medium whitespace-nowrap">
+                        {formatCurrency(invoice.total_ttc)}
+                      </td>
+                      {/* Statut */}
+                      <td className="px-3 py-4 text-center text-sm whitespace-nowrap">
+                        <StatusBadge invoice={invoice} />
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Controls */}
+        {/* Pagination */}
         <div className="border-border bg-surface flex items-center justify-between border-t px-4 py-3 sm:px-6">
+          {/* Version desktop */}
           <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-            <div>
-              <p className="text-muted text-sm">
-                Affichage de la page{' '}
-                <span className="font-medium">{page + 1}</span>
-                {totalItems > 0 && (
-                  <>
-                    {' '}
-                    / <span className="font-medium">{Math.ceil(totalItems / limit)}</span>
-                  </>
-                )}
-              </p>
-            </div>
-            <div>
-              <nav
-                className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                aria-label="Pagination"
+            <p className="text-muted text-sm">
+              Page <span className="font-medium">{page + 1}</span>
+              {totalItems > 0 && (
+                <>
+                  {' '}
+                  /{' '}
+                  <span className="font-medium">
+                    {Math.ceil(totalItems / PAGE_LIMIT)}
+                  </span>
+                </>
+              )}
+            </p>
+            <nav
+              className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+              aria-label="Pagination"
+            >
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0 || loading}
+                className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-l-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0 || loading}
-                  className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-l-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
+                <span className="sr-only">Précédent</span>
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
                 >
-                  <span className="sr-only">Précédent</span>
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={!hasMore || loading}
-                  className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-r-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
+                  <path
+                    fillRule="evenodd"
+                    d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasMore || loading}
+                className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-r-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="sr-only">Suivant</span>
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
                 >
-                  <span className="sr-only">Suivant</span>
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </nav>
-            </div>
+                  <path
+                    fillRule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </nav>
           </div>
 
+          {/* Version mobile */}
           <div className="flex flex-1 justify-between sm:hidden">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}

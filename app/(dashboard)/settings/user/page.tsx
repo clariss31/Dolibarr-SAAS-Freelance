@@ -75,6 +75,7 @@ export default function UserProfilePage() {
     }
   };
 
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
