@@ -203,6 +203,16 @@ export default function BillingPaymentsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // Nouveaux filtres de date
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [startDue, setStartDue] = useState('');
+  const [endDue, setEndDue] = useState('');
+
+  // Totaux de la période
+  const [periodTotals, setPeriodTotals] = useState({ ht: 0, ttc: 0 });
+  const [loadingTotals, setLoadingTotals] = useState(false);
+
   // ---------------------------------------------------------------------------
   // Préchargement du dictionnaire des tiers
   // ---------------------------------------------------------------------------
@@ -256,7 +266,15 @@ export default function BillingPaymentsPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [activeTab, debouncedSearch, statusFilter]);
+  }, [
+    activeTab,
+    debouncedSearch,
+    statusFilter,
+    startDate,
+    endDate,
+    startDue,
+    endDue,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Chargement des factures
@@ -301,6 +319,24 @@ export default function BillingPaymentsPage() {
           conditions.push(
             `((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`
           );
+        }
+
+        // Filtres de date de facturation (t.date)
+        if (startDate) {
+          conditions.push(`(t.date:>=:'${startDate} 00:00:00')`);
+        }
+        if (endDate) {
+          conditions.push(`(t.date:<=:'${endDate} 23:59:59')`);
+        }
+
+        // Filtres de date d'échéance (t.date_lim_reglement)
+        const dueField =
+          activeTab === 'client' ? 't.date_lim_reglement' : 't.date_echeance';
+        if (startDue) {
+          conditions.push(`(${dueField}:>=:'${startDue} 00:00:00')`);
+        }
+        if (endDue) {
+          conditions.push(`(${dueField}:<=:'${endDue} 23:59:59')`);
         }
 
         let query = `${endpoint}?sortfield=t.rowid&sortorder=DESC&limit=${PAGE_LIMIT}&page=${currentPage}`;
@@ -351,8 +387,94 @@ export default function BillingPaymentsPage() {
         setLoading(false);
       }
     },
-    [activeTab, debouncedSearch, statusFilter]
+    [
+      activeTab,
+      debouncedSearch,
+      statusFilter,
+      startDate,
+      endDate,
+      startDue,
+      endDue,
+    ]
   );
+
+  /**
+   * Calcule les totaux globaux pour les filtres actuels.
+   * Utilise une requête avec limit=1000 pour couvrir une large période sans pagination.
+   */
+  const fetchTotals = useCallback(async () => {
+    setLoadingTotals(true);
+    try {
+      const endpoint =
+        activeTab === 'client' ? '/invoices' : '/supplierinvoices';
+      const conditions: string[] = [];
+
+      if (statusFilter !== 'all' && statusFilter !== 'part') {
+        conditions.push(`(t.fk_statut:=:${statusFilter})`);
+      }
+      if (debouncedSearch) {
+        const safe = debouncedSearch.replace(/'/g, "''");
+        conditions.push(
+          `((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`
+        );
+      }
+      if (startDate) conditions.push(`(t.date:>=:'${startDate} 00:00:00')`);
+      if (endDate) conditions.push(`(t.date:<=:'${endDate} 23:59:59')`);
+
+      const dueField =
+        activeTab === 'client' ? 't.date_lim_reglement' : 't.date_echeance';
+      if (startDue) conditions.push(`(${dueField}:>=:'${startDue} 00:00:00')`);
+      if (endDue) conditions.push(`(${dueField}:<=:'${endDue} 23:59:59')`);
+
+      let query = `${endpoint}?limit=1000`;
+      if (conditions.length > 0) {
+        query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
+      }
+
+      const res = await api.get(query);
+      if (Array.isArray(res.data)) {
+        let docs = res.data;
+        // Application filtres spécifiques client-side si besoin
+        if (statusFilter === 'part') {
+          docs = docs.filter((d: any) => Number(d.totalpaid) > 0);
+        } else if (statusFilter === '1') {
+          docs = docs.filter((d: any) => Number(d.totalpaid) === 0);
+        }
+
+        const ht = docs.reduce(
+          (acc: number, d: any) => acc + (Number(d.total_ht) || 0),
+          0
+        );
+        const ttc = docs.reduce(
+          (acc: number, d: any) => acc + (Number(d.total_ttc) || 0),
+          0
+        );
+        setPeriodTotals({ ht, ttc });
+      } else {
+        setPeriodTotals({ ht: 0, ttc: 0 });
+      }
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setPeriodTotals({ ht: 0, ttc: 0 });
+      } else {
+        console.error('Erreur calcul totaux:', err);
+      }
+    } finally {
+      setLoadingTotals(false);
+    }
+  }, [
+    activeTab,
+    debouncedSearch,
+    statusFilter,
+    startDate,
+    endDate,
+    startDue,
+    endDue,
+  ]);
+
+  useEffect(() => {
+    fetchTotals();
+  }, [fetchTotals]);
 
   /** Recharge les factures à chaque changement de page ou de filtre. */
   useEffect(() => {
@@ -369,7 +491,7 @@ export default function BillingPaymentsPage() {
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            Facturation &amp; Paiements
+            Facturation & Paiement
           </h1>
           <p className="text-muted mt-2 text-sm">
             Suivi des factures, paiements et encours
@@ -427,7 +549,107 @@ export default function BillingPaymentsPage() {
         </nav>
       </div>
 
-      {/* Barre de filtres */}
+      {/* Zone Haute : Dates et Totaux */}
+      <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between">
+        {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
+        <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
+          <div className="min-w-[120px] flex-1">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+              Facturation Du
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          <div className="min-w-[120px] flex-1">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+              au
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          <div className="min-w-[120px] flex-1">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+              Échéance Du
+            </label>
+            <input
+              type="date"
+              value={startDue}
+              onChange={(e) => setStartDue(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          <div className="min-w-[120px] flex-1">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+              au
+            </label>
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                value={endDue}
+                onChange={(e) => setEndDue(e.target.value)}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+              />
+              {(startDate || endDate || startDue || endDue) && (
+                <button
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setStartDue('');
+                    setEndDue('');
+                  }}
+                  className="text-muted transition-colors hover:text-red-500"
+                  title="Réinitialiser"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Résumé des totaux de la période */}
+        <div className="bg-primary/5 border-primary/10 flex flex-1 items-center justify-around gap-4 rounded-xl border px-6 lg:min-w-[320px] lg:flex-none">
+          <div className="flex flex-col text-center">
+            <span className="text-muted text-[10px] font-bold tracking-widest uppercase">
+              Total HT
+            </span>
+            <span className="text-foreground mt-0.5 text-xl leading-tight font-bold">
+              {loadingTotals ? '...' : formatCurrency(periodTotals.ht)}
+            </span>
+          </div>
+          <div className="bg-primary/10 h-8 w-px" />
+          <div className="flex flex-col text-center">
+            <span className="text-muted text-[10px] font-bold tracking-widest uppercase">
+              Total TTC
+            </span>
+            <span className="text-foreground mt-0.5 text-xl leading-tight font-bold">
+              {loadingTotals ? '...' : formatCurrency(periodTotals.ttc)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Barre de filtres (Recherche + Statut) - Positionnée après les dates */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
         {/* Recherche */}
         <div className="flex-1">
@@ -437,7 +659,7 @@ export default function BillingPaymentsPage() {
           <input
             id="search"
             type="search"
-            placeholder="Rechercher par réf. ou client..."
+            placeholder="Rechercher..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"

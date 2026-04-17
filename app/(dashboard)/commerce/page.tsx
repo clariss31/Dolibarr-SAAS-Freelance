@@ -109,6 +109,16 @@ export default function CommercePage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // Filtres de date
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [startDue, setStartDue] = useState('');
+  const [endDue, setEndDue] = useState('');
+
+  // Totaux de la période
+  const [periodTotalHT, setPeriodTotalHT] = useState(0);
+  const [loadingTotal, setLoadingTotal] = useState(false);
+
   // --- Effets ---
 
   /** Pré-chargement des tiers (Mapping ID -> Nom) */
@@ -139,7 +149,7 @@ export default function CommercePage() {
   /** Reset de la pagination lors des changements de filtre */
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, startDate, endDate, startDue, endDue]);
 
   /** Chargement des devis via l'API */
   const fetchProposals = useCallback(async () => {
@@ -160,6 +170,14 @@ export default function CommercePage() {
           `((t.ref:like:'%${cleanTerm}%') OR (s.nom:like:'%${cleanTerm}%'))`
         );
       }
+
+      // Filtre Date Proposition (t.datep)
+      if (startDate) conditions.push(`(t.datep:>=:'${startDate} 00:00:00')`);
+      if (endDate) conditions.push(`(t.datep:<=:'${endDate} 23:59:59')`);
+
+      // Filtre Date Fin Validité (t.fin_validite)
+      if (startDue) conditions.push(`(t.fin_validite:>=:'${startDue} 00:00:00')`);
+      if (endDue) conditions.push(`(t.fin_validite:<=:'${endDue} 23:59:59')`);
 
       if (conditions.length > 0) {
         query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
@@ -192,7 +210,48 @@ export default function CommercePage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, startDate, endDate, startDue, endDue]);
+
+  /** Calcule le total HT de tous les devis de la période filtrée. */
+  const fetchTotals = useCallback(async () => {
+    setLoadingTotal(true);
+    try {
+      const conditions: string[] = [];
+      if (statusFilter !== 'all') conditions.push(`(t.fk_statut:=:${statusFilter})`);
+      if (debouncedSearch) {
+        const safe = debouncedSearch.replace(/'/g, "''");
+        conditions.push(`((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`);
+      }
+      if (startDate) conditions.push(`(t.datep:>=:'${startDate} 00:00:00')`);
+      if (endDate) conditions.push(`(t.datep:<=:'${endDate} 23:59:59')`);
+      if (startDue) conditions.push(`(t.fin_validite:>=:'${startDue} 00:00:00')`);
+      if (endDue) conditions.push(`(t.fin_validite:<=:'${endDue} 23:59:59')`);
+
+      let query = `/proposals?limit=1000`;
+      if (conditions.length > 0) {
+        query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
+      }
+      const res = await api.get(query);
+      if (Array.isArray(res.data)) {
+        const totalHT = res.data.reduce((acc: number, p: any) => acc + (Number(p.total_ht) || 0), 0);
+        setPeriodTotalHT(totalHT);
+      } else {
+        setPeriodTotalHT(0);
+      }
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setPeriodTotalHT(0);
+      } else {
+        console.error('Erreur calcul total HT:', err);
+      }
+    } finally {
+      setLoadingTotal(false);
+    }
+  }, [debouncedSearch, statusFilter, startDate, endDate, startDue, endDue]);
+
+  useEffect(() => {
+    fetchTotals();
+  }, [fetchTotals]);
 
   useEffect(() => {
     fetchProposals();
@@ -237,12 +296,91 @@ export default function CommercePage() {
         </div>
       </div>
 
+      {/* Zone Haute : Dates et Totaux */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between w-full">
+        {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
+        <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
+              Proposition Du
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+              au
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
+              Fin validité Du
+            </label>
+            <input
+              type="date"
+              value={startDue}
+              onChange={(e) => setStartDue(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+              au
+            </label>
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                value={endDue}
+                onChange={(e) => setEndDue(e.target.value)}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+              />
+              {(startDate || endDate || startDue || endDue) && (
+                <button
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setStartDue('');
+                    setEndDue('');
+                  }}
+                  className="text-muted hover:text-red-500 transition-colors"
+                  title="Réinitialiser"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Résumé HT */}
+        <div className="bg-primary/5 border-primary/10 flex flex-1 items-center justify-around rounded-xl border px-8 lg:flex-none lg:min-w-[240px]">
+          <div className="flex flex-col text-center">
+            <span className="text-muted text-[10px] font-bold tracking-widest uppercase text-nowrap">Total HT (Période)</span>
+            <span className="text-foreground mt-0.5 text-xl font-bold leading-tight">
+              {loadingTotal ? '...' : formatCurrency(periodTotalHT)}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Barre de Filtres */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="flex-1">
           <input
             type="search"
-            placeholder="Chercher une référence ou un client..."
+            placeholder="Rechercher..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"

@@ -2,9 +2,9 @@
 
 /**
  * @file app/(dashboard)/third-parties/page.tsx
- * 
+ *
  * Page de liste des tiers (Clients, Prospects, Fournisseurs).
- * 
+ *
  * Fonctionnalités :
  * - Filtrage par type de tiers (Client, Prospect, Fournisseur, Tous).
  * - Recherche textuelle debouncée sur le nom du tiers.
@@ -26,12 +26,13 @@ import { ThirdParty, ApiError } from '../../../types/dolibarr';
 function getTierTypeLabels(tier: ThirdParty): React.ReactNode {
   const types: string[] = [];
   const clientStatus = String(tier.client);
-  
+
   if (clientStatus === '1' || clientStatus === '3') types.push('Client');
   if (clientStatus === '2' || clientStatus === '3') types.push('Prospect');
-  if (String(tier.fournisseur) === '1')             types.push('Fournisseur');
+  if (String(tier.fournisseur) === '1') types.push('Fournisseur');
 
-  if (types.length === 0) return <span className="text-muted italic">Non défini</span>;
+  if (types.length === 0)
+    return <span className="text-muted italic">Non défini</span>;
   return types.join(' / ');
 }
 
@@ -50,19 +51,19 @@ export default function ThirdPartiesPage() {
   const router = useRouter();
 
   // --- États : Liste & Données ---
-  const [tiers,      setTiers]      = useState<ThirdParty[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState('');
+  const [tiers, setTiers] = useState<ThirdParty[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // --- États : Pagination ---
-  const [page,       setPage]       = useState(0);
+  const [page, setPage] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
-  const [hasMore,    setHasMore]    = useState(true);
+  const [hasMore, setHasMore] = useState(true);
 
   // --- États : Filtres ---
-  const [searchTerm,      setSearchTerm]      = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [typeFilter,      setTypeFilter]      = useState('all'); // all, client, prospect, fournisseur
+  const [typeFilter, setTypeFilter] = useState('all'); // all, client, prospect, fournisseur
 
   // --- Effets ---
 
@@ -88,8 +89,8 @@ export default function ThirdPartiesPage() {
       let query = `/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=${PAGE_LIMIT}&page=${page}`;
 
       // 1. Filtre par type via le paramètre natif "mode" de Dolibarr
-      if (typeFilter === 'client')      query += `&mode=1`;
-      if (typeFilter === 'prospect')    query += `&mode=2`;
+      if (typeFilter === 'client') query += `&mode=1`;
+      if (typeFilter === 'prospect') query += `&mode=2`;
       if (typeFilter === 'fournisseur') query += `&mode=4`;
 
       // 2. Filtre de recherche SQL
@@ -110,7 +111,10 @@ export default function ThirdPartiesPage() {
         if (total) {
           setTotalItems(parseInt(total, 10));
         } else {
-          setTotalItems(response.data.length + (response.data.length === PAGE_LIMIT ? PAGE_LIMIT : 0));
+          setTotalItems(
+            response.data.length +
+              (response.data.length === PAGE_LIMIT ? PAGE_LIMIT : 0)
+          );
         }
       } else {
         setTiers([]);
@@ -142,8 +146,12 @@ export default function ThirdPartiesPage() {
       {/* En-tête de page */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-foreground text-2xl font-bold tracking-tight">Tiers</h1>
-          <p className="text-muted mt-2 text-sm">Recherchez et gérez vos clients, prospects et fournisseurs.</p>
+          <h1 className="text-foreground text-2xl font-bold tracking-tight">
+            Tiers
+          </h1>
+          <p className="text-muted mt-2 text-sm">
+            Recherchez et gérez vos clients, prospects et fournisseurs.
+          </p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           <button
@@ -157,7 +165,10 @@ export default function ThirdPartiesPage() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200" role="alert">
+        <div
+          className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -168,10 +179,10 @@ export default function ThirdPartiesPage() {
           <input
             id="search"
             type="search"
-            placeholder="Rechercher par nom..."
+            placeholder="Rechercher..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-background text-foreground ring-border focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 shadow-sm"
+            className="bg-background text-foreground ring-border focus:ring-primary block w-full max-w-md rounded-md px-3 py-2 text-sm shadow-sm ring-1 ring-inset focus:ring-2"
           />
         </div>
         <div>
@@ -179,7 +190,7 @@ export default function ThirdPartiesPage() {
             id="type-filter"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 shadow-sm"
+            className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm shadow-sm ring-1 ring-inset focus:ring-2"
           >
             <option value="all">Tous les types</option>
             <option value="client">Client</option>
@@ -195,17 +206,51 @@ export default function ThirdPartiesPage() {
           <table className="divide-border min-w-full divide-y">
             <thead className="bg-background">
               <tr>
-                <th scope="col" className="text-foreground w-[35%] py-3.5 pr-3 pl-4 text-left text-sm font-semibold sm:pl-6">Nom</th>
-                <th scope="col" className="text-foreground w-[15%] px-3 py-3.5 text-left text-sm font-semibold">Type</th>
-                <th scope="col" className="text-foreground w-[25%] px-3 py-3.5 text-left text-sm font-semibold">Email</th>
-                <th scope="col" className="text-foreground w-[15%] px-3 py-3.5 text-left text-sm font-semibold">Téléphone</th>
+                <th
+                  scope="col"
+                  className="text-foreground w-[35%] py-3.5 pr-3 pl-4 text-left text-sm font-semibold sm:pl-6"
+                >
+                  Nom
+                </th>
+                <th
+                  scope="col"
+                  className="text-foreground w-[15%] px-3 py-3.5 text-left text-sm font-semibold"
+                >
+                  Type
+                </th>
+                <th
+                  scope="col"
+                  className="text-foreground w-[25%] px-3 py-3.5 text-left text-sm font-semibold"
+                >
+                  Email
+                </th>
+                <th
+                  scope="col"
+                  className="text-foreground w-[15%] px-3 py-3.5 text-left text-sm font-semibold"
+                >
+                  Téléphone
+                </th>
               </tr>
             </thead>
             <tbody className="divide-border bg-surface divide-y">
               {loading && tiers.length === 0 ? (
-                <tr><td colSpan={4} className="text-muted py-10 text-center text-sm italic">Recherche en cours...</td></tr>
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="text-muted py-10 text-center text-sm italic"
+                  >
+                    Recherche en cours...
+                  </td>
+                </tr>
               ) : tiers.length === 0 ? (
-                <tr><td colSpan={4} className="text-muted py-10 text-center text-sm">Aucun tiers trouvé.</td></tr>
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="text-muted py-10 text-center text-sm"
+                  >
+                    Aucun tiers trouvé.
+                  </td>
+                </tr>
               ) : (
                 tiers.map((t) => (
                   <tr
@@ -224,18 +269,26 @@ export default function ThirdPartiesPage() {
                         <a
                           href={`mailto:${t.email}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-primary hover:underline font-medium"
-                        >{t.email}</a>
-                      ) : '-'}
+                          className="text-primary font-medium hover:underline"
+                        >
+                          {t.email}
+                        </a>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="text-muted px-3 py-4 text-sm whitespace-nowrap">
                       {t.phone ? (
                         <a
                           href={`tel:${t.phone}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-primary hover:underline font-medium"
-                        >{t.phone}</a>
-                      ) : '-'}
+                          className="text-primary font-medium hover:underline"
+                        >
+                          {t.phone}
+                        </a>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                   </tr>
                 ))
@@ -249,17 +302,37 @@ export default function ThirdPartiesPage() {
           <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
             <p className="text-muted text-sm">
               Page <span className="font-medium">{page + 1}</span>
-              {totalItems > 0 && <span> / <span className="font-medium">{Math.ceil(totalItems / PAGE_LIMIT)}</span></span>}
+              {totalItems > 0 && (
+                <span>
+                  {' '}
+                  /{' '}
+                  <span className="font-medium">
+                    {Math.ceil(totalItems / PAGE_LIMIT)}
+                  </span>
+                </span>
+              )}
             </p>
-            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+            <nav
+              className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+              aria-label="Pagination"
+            >
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0 || loading}
                 className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-l-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="sr-only">Précédent</span>
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </button>
               <button
@@ -268,8 +341,17 @@ export default function ThirdPartiesPage() {
                 className="text-muted ring-border hover:bg-background hover:text-foreground relative inline-flex items-center rounded-r-md px-2 py-2 ring-1 ring-inset focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="sr-only">Suivant</span>
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </button>
             </nav>
