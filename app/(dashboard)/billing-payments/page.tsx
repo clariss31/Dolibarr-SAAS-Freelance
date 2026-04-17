@@ -113,13 +113,24 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
           Brouillon
         </span>
       );
-    case 1:
-      // Statut 1 = validée (impayée ou partiellement payée)
+    case 1: {
+      const invAny = invoice as any;
+      // 'totalpaid' est le champ exact identifié sur votre serveur
+      const sommePaye = Number(invAny.totalpaid) || 0;
+
+      if (sommePaye > 0) {
+        return (
+          <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-600/20 ring-inset">
+            Règlement commencé
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-600/20 ring-inset">
           Impayée
         </span>
       );
+    }
     case 2:
       return (
         <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
@@ -261,7 +272,14 @@ export default function BillingPaymentsPage() {
 
         // Filtre par statut
         if (statusFilter !== 'all') {
-          conditions.push(`(t.fk_statut:=:${statusFilter})`);
+          if (statusFilter === 'part') {
+            // Statut partial : validé (1) mais avec quelque chose de payé
+            // Note: Dolibarr ne permet pas toujours de filtrer sur le montant payé en SQL via l'API,
+            // on filtre sur statut=1 et on filtrera côté client si besoin, mais ici on reste sur statut=1
+            conditions.push(`(t.fk_statut:=:1)`);
+          } else {
+            conditions.push(`(t.fk_statut:=:${statusFilter})`);
+          }
         }
 
         // Recherche sur la référence et le nom du tiers
@@ -279,14 +297,22 @@ export default function BillingPaymentsPage() {
 
         const response = await api.get(query);
 
-        if (!Array.isArray(response.data)) {
-          setInvoices([]);
-          setHasMore(false);
-          setTotalItems(0);
-          return;
+        // Si on a demandé specifically "Règlement commencé" (part) ou "Impayée" (1)
+        // on affine côté client pour les séparer strictement.
+        let finalInvoices = response.data;
+        if (Array.isArray(finalInvoices)) {
+          if (statusFilter === 'part') {
+            finalInvoices = finalInvoices.filter(
+              (inv) => Number((inv as any).totalpaid) > 0
+            );
+          } else if (statusFilter === '1') {
+            finalInvoices = finalInvoices.filter(
+              (inv) => Number((inv as any).totalpaid) === 0
+            );
+          }
         }
 
-        setInvoices(response.data);
+        setInvoices(finalInvoices || []);
         setHasMore(response.data.length === PAGE_LIMIT);
 
         // Total : header HTTP ou estimation
@@ -419,6 +445,7 @@ export default function BillingPaymentsPage() {
             <option value="all">Tous les états</option>
             <option value="0">Brouillon</option>
             <option value="1">Impayée</option>
+            <option value="part">Règlement commencé</option>
             <option value="2">Payée</option>
             <option value="3">Abandonnée</option>
           </select>

@@ -69,7 +69,7 @@ export default function CompanySettingsPage() {
     setSuccess('');
 
     try {
-      await api.put('/setup/organization', {
+      await api.put('/setup/company', {
         name,
         address,
         zip,
@@ -210,7 +210,8 @@ export default function CompanySettingsPage() {
               </label>
               <input
                 id="company-url"
-                type="url"
+                type="text"
+                inputMode="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary mt-1 block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"

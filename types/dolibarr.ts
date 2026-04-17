@@ -79,6 +79,22 @@ export interface Proposal {
   lines?: ProposalLine[];
 }
 
+// Définition du type règlement (paiement partiel ou total d'une facture)
+export interface InvoicePayment {
+  id: string | number;
+  ref?: string;
+  datepaye: number | string;
+  paiementid?: string | number;      // ID du mode de paiement
+  paiementcode?: string;             // Code du mode (ex: CB, CHQ, LIQ...)
+  type?: string;                     // Autre champ pour le code du mode
+  fk_bank?: string | number;         // ID du compte bancaire
+  bank_account?: string;             // Label du compte bancaire
+  amount: number | string;           // Montant réglé
+  multicurrency_amount?: number | string;
+  num_paiement?: string;             // Référence du paiement
+  note_public?: string;
+}
+
 // Définition du type facture
 export interface Invoice {
   id: string;
@@ -96,6 +112,13 @@ export interface Invoice {
   total_ttc: number | string;
   paye: string | number;
   statut: string | number;
+  fk_account?: string | number;
+  /** Somme déjà réglée (identifiée sur le serveur du client) */
+  totalpaid?: number | string;
+  /** Somme déjà réglée (variantes Dolibarr classiques) */
+  sumpayed?: number | string;
+  already_payed?: number | string;
+  remaintopay?: number | string;
   lines?: ProposalLine[];
 }
 

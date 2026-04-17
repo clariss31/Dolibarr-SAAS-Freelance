@@ -29,6 +29,8 @@ export function getErrorMessage(error: unknown, context?: string): string {
       return "Accès restreint. Vous n'avez pas les droits nécessaires pour effectuer cette action.";
     case 404:
       return "La ressource demandée semble avoir été déplacée ou supprimée.";
+    case 405:
+      return "Cette action n'est pas autorisée par l'API Dolibarr (Méthode non autorisée).";
     case 500:
       return "Le serveur rencontre une erreur inattendue. Nos équipes techniques ont été prévenues.";
     case 503:

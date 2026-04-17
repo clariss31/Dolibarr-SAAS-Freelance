@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '../../services/api';
 import { getErrorMessage } from '../../utils/error-handler';
-import { Invoice, Proposal, Product, ThirdParty } from '../../types/dolibarr';
+import {
+  Invoice,
+  Proposal,
+  Product,
+  ThirdParty,
+  Organization,
+} from '../../types/dolibarr';
 import StatCard from '../../components/dashboard/StatCard';
 import PeriodFilter, { Period } from '../../components/dashboard/PeriodFilter';
 
@@ -14,6 +20,9 @@ export default function DashboardRootPage() {
 
   // Period State
   const [period, setPeriod] = useState<Period>({ type: 'month' });
+
+  // Company State
+  const [isTvaAssuj, setIsTvaAssuj] = useState(true);
 
   // KPI States
   const [stats, setStats] = useState({
@@ -117,6 +126,7 @@ export default function DashboardRootPage() {
           proposalsRes,
           clientInvoicesRes,
           supplierInvoicesRes,
+          companyRes,
         ] = await Promise.allSettled([
           api.get('/invoices?limit=1000&sortfield=t.datec&sortorder=DESC'),
           api.get('/proposals?limit=100&sqlfilters=(t.fk_statut:=:1)'),
@@ -127,6 +137,7 @@ export default function DashboardRootPage() {
           api.get('/proposals?limit=5&sortfield=t.tms&sortorder=DESC'),
           api.get('/invoices?limit=5&sortfield=t.tms&sortorder=DESC'),
           api.get('/supplierinvoices?limit=5&sortfield=t.tms&sortorder=DESC'),
+          api.get('/setup/company'),
         ]);
 
         const nowTs = Math.floor(Date.now() / 1000);
@@ -265,6 +276,11 @@ export default function DashboardRootPage() {
           setRecentClientInvoices(clientInvoicesRes.value.data || []);
         if (supplierInvoicesRes.status === 'fulfilled')
           setRecentSupplierInvoices(supplierInvoicesRes.value.data || []);
+
+        if (companyRes.status === 'fulfilled' && companyRes.value.data) {
+          const org = companyRes.value.data as Organization;
+          setIsTvaAssuj(String(org.tva_assuj) === '1');
+        }
 
         // If many critical requests failed, show a warning
         const failures = [
@@ -534,14 +550,22 @@ export default function DashboardRootPage() {
               trend={caTrend}
               icon="📈"
               colorClassName="text-blue-600"
-              description={`${formatCurrency(stats.caTTC)} TTC - ${formatCurrency(stats.caTVA)} TVA`}
+              description={
+                isTvaAssuj
+                  ? `${formatCurrency(stats.caTTC)} TTC - ${formatCurrency(stats.caTVA)} TVA`
+                  : undefined
+              }
             />
             <StatCard
               label="Devis en attente HT"
               value={formatCurrency(stats.pendingProposalsHT)}
               icon="📄"
               colorClassName="text-purple-600"
-              description={`${formatCurrency(stats.pendingProposalsTTC)} TTC - ${formatCurrency(stats.pendingProposalsTVA)} TVA`}
+              description={
+                isTvaAssuj
+                  ? `${formatCurrency(stats.pendingProposalsTTC)} TTC - ${formatCurrency(stats.pendingProposalsTVA)} TVA`
+                  : undefined
+              }
               href="/commerce"
             />
             <StatCard
@@ -554,7 +578,11 @@ export default function DashboardRootPage() {
               }
               icon="⏳"
               colorClassName="text-amber-600"
-              description={`${formatCurrency(stats.unpaidInvoicesTTC)} TTC - ${formatCurrency(stats.unpaidInvoicesTVA)} TVA`}
+              description={
+                isTvaAssuj
+                  ? `${formatCurrency(stats.unpaidInvoicesTTC)} TTC - ${formatCurrency(stats.unpaidInvoicesTVA)} TVA`
+                  : undefined
+              }
               href="/billing-payments"
             />
             <StatCard
@@ -567,7 +595,11 @@ export default function DashboardRootPage() {
               }
               icon="💳"
               colorClassName="text-red-600"
-              description={`${formatCurrency(stats.upcomingSupplierTTC)} TTC - ${formatCurrency(stats.upcomingSupplierTVA)} TVA`}
+              description={
+                isTvaAssuj
+                  ? `${formatCurrency(stats.upcomingSupplierTTC)} TTC - ${formatCurrency(stats.upcomingSupplierTVA)} TVA`
+                  : undefined
+              }
               href="/billing-payments"
             />
           </div>
