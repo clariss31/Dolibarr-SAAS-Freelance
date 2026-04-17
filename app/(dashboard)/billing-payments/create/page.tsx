@@ -178,7 +178,7 @@ function CreateInvoiceForm() {
     const payload = {
       socid:     parseInt(formData.socid, 10),
       date:      dateStringToTimestamp(formData.date),
-      datelimit: dateStringToTimestamp(formData.datelimit),
+      date_lim_reglement: dateStringToTimestamp(formData.datelimit),
       lines: lines.map((line) => ({
         fk_product:   line.fk_product ? parseInt(line.fk_product, 10) : 0,
         product_type: line.product_type,

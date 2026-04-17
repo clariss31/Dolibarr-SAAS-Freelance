@@ -13,7 +13,7 @@
  * - Validation simple et gestion des erreurs API.
  */
 
-import { useState, Suspense, useCallback } from 'react';
+import { useState, Suspense, useCallback, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
@@ -35,6 +35,20 @@ export default function CreateThirdPartyPage() {
       <CreateThirdPartyForm />
     </Suspense>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Incrémente la partie numérique d'un code (ex: CU2404-001 -> CU2404-002)
+ */
+function incrementCode(code: string): string {
+  return code.replace(/(\d+)(?!.*\d)/, (match) => {
+    const next = parseInt(match, 10) + 1;
+    return next.toString().padStart(match.length, '0');
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -61,11 +75,46 @@ function CreateThirdPartyForm() {
     tva_intra: '',
     idprof2: '',
     code_client: '',
+    code_fournisseur: '',
     t_type: initialType,
   });
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // --- Suggestions ---
+
+  /** Suggère le prochain code libre en se basant sur le dernier existant */
+  const suggestNextCode = useCallback(async (type: string) => {
+    const field = type === 'fournisseur' ? 't.code_fournisseur' : 't.code_client';
+    try {
+      // On cherche le dernier code par ordre décroissant
+      const res = await api.get(`/thirdparties?limit=1&sortfield=${field}&sortorder=DESC`);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        const lastCode = type === 'fournisseur' ? res.data[0].code_fournisseur : res.data[0].code_client;
+        if (lastCode && lastCode !== '-1') {
+          return incrementCode(lastCode);
+        }
+      }
+    } catch (e) {
+      console.warn('Impossible de suggérer un code:', e);
+    }
+    return '';
+  }, []);
+
+  // Pré-remplissage au montage et changement de type
+  useEffect(() => {
+    const fillSuggestion = async () => {
+      const suggested = await suggestNextCode(formData.t_type);
+      if (suggested) {
+        setFormData(prev => ({
+          ...prev,
+          [formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client']: suggested
+        }));
+      }
+    };
+    fillSuggestion();
+  }, [formData.t_type, suggestNextCode]);
 
   // --- Handlers ---
 
@@ -110,6 +159,31 @@ function CreateThirdPartyForm() {
     }
     if (fournisseurStatus > 0 && !cleanPayload.code_fournisseur) {
       cleanPayload.code_fournisseur = '-1';
+    }
+
+    // --- Vérification de l'existence du code ---
+    const targetCode = formData.t_type === 'fournisseur' ? formData.code_fournisseur : formData.code_client;
+    if (targetCode && targetCode !== '-1') {
+      try {
+        const field = formData.t_type === 'fournisseur' ? 't.code_fournisseur' : 't.code_client';
+        const checkRes = await api.get(`/thirdparties?sqlfilters=(${field}:=:'${targetCode}')`);
+        if (Array.isArray(checkRes.data) && checkRes.data.length > 0) {
+          setError("Code client ou fournisseur déjà utilisé, un nouveau code est suggéré");
+          // Re-suggérer un nouveau code
+          const newSuggestion = await suggestNextCode(formData.t_type);
+          if (newSuggestion) {
+            setFormData(prev => ({
+              ...prev,
+              [formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client']: newSuggestion
+            }));
+          }
+          setSaving(false);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      } catch (e) {
+        // En cas d'erreur de check, on continue
+      }
     }
 
     try {
@@ -184,16 +258,16 @@ function CreateThirdPartyForm() {
             </div>
             <div>
               <label
-                htmlFor="code_client"
+                htmlFor="dynamic_code"
                 className="text-foreground mb-2 block text-sm font-medium"
               >
-                Code client / fournisseur
+                {formData.t_type === 'fournisseur' ? 'Code fournisseur' : 'Code client'}
               </label>
               <input
                 type="text"
-                id="code_client"
-                name="code_client"
-                value={formData.code_client}
+                id="dynamic_code"
+                name={formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client'}
+                value={formData.t_type === 'fournisseur' ? formData.code_fournisseur : formData.code_client}
                 onChange={handleChange}
                 placeholder="Laissé vide : généré automatiquement"
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"

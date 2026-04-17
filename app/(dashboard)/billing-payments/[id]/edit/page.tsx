@@ -185,7 +185,7 @@ function EditInvoiceContent({ id }: { id: string }) {
         setInvoiceRef(invoice.ref);
         setFormData({
           date: timestampToDateString(invoice.date),
-          datelimit: timestampToDateString(invoice.datelimit),
+          datelimit: timestampToDateString(invoice.datelimit ?? invoice.date_lim_reglement ?? invoice.date_echeance),
         });
 
         // Chargement des lignes : payload d'abord, repli endpoint dédié ensuite
@@ -270,7 +270,7 @@ function EditInvoiceContent({ id }: { id: string }) {
       // Mise à jour des métadonnées de la facture
       await api.put(`${endpoint}/${id}`, {
         date: dateStringToTimestamp(formData.date),
-        datelimit: dateStringToTimestamp(formData.datelimit),
+        date_lim_reglement: dateStringToTimestamp(formData.datelimit),
       });
 
       // Resynchronisation des lignes uniquement en mode brouillon

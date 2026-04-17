@@ -95,12 +95,20 @@ export default function ThirdPartyDetailsPage() {
       await api.delete(`/thirdparties/${id}`);
       router.push('/third-parties');
     } catch (err: unknown) {
-      const apiErr = err as Error & ApiError;
-      const detailMsg =
-        apiErr.response?.data?.error?.message ||
-        'Impossible de supprimer ce tiers. Il est probablement lié à des factures ou propositions existantes.';
+      const apiErr = err as any;
+      let detailMsg = 'Une erreur est survenue lors de la suppression.';
+      
+      const rawMessage = apiErr.response?.data?.error?.message || '';
+      if (rawMessage.includes('product is probably used') || apiErr.response?.status === 409) {
+        detailMsg = 'Impossible de supprimer ce tiers car il est lié à des documents (factures, devis, etc.).';
+      } else if (rawMessage) {
+        detailMsg = rawMessage;
+      }
+
       setError(detailMsg);
       setDeleting(false);
+      // Remonter en haut de page pour voir l'erreur
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -114,7 +122,7 @@ export default function ThirdPartyDetailsPage() {
     );
   }
 
-  if (error || !tier) {
+  if (!tier) {
     return (
       <div className="space-y-4">
         <button
@@ -124,7 +132,7 @@ export default function ThirdPartyDetailsPage() {
           &larr; Retour à la liste
         </button>
         <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
-          {error || 'Introuvable'}
+          Tiers introuvable
         </div>
       </div>
     );
@@ -143,6 +151,18 @@ export default function ThirdPartyDetailsPage() {
           &larr; Retour à la liste
         </button>
       </div>
+
+      {/* Alertes d'erreur (ex: échec de suppression) */}
+      {error && (
+        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200" role="alert">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <p className="font-semibold">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Header : Titre et Actions */}
       <div className="border-border border-b py-2 sm:flex sm:items-center sm:justify-between">
@@ -316,14 +336,29 @@ export default function ThirdPartyDetailsPage() {
                 )}
               </p>
             </div>
-            <div>
-              <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                Code client
-              </p>
-              <p className="text-foreground bg-background border-border mt-1 max-w-fit rounded border px-2 py-0.5 font-mono text-sm">
-                {tier.code_client || 'Généré automatiquement'}
-              </p>
-            </div>
+            {/* Code Client */}
+            {(String(tier.client) !== '0') && (
+              <div>
+                <p className="text-muted text-xs font-medium tracking-wider uppercase">
+                  Code client
+                </p>
+                <p className="text-foreground bg-background border-border mt-1 max-w-fit rounded border px-2 py-0.5 font-mono text-sm">
+                  {tier.code_client || 'Non défini'}
+                </p>
+              </div>
+            )}
+
+            {/* Code Fournisseur */}
+            {String(tier.fournisseur) === '1' && (
+              <div>
+                <p className="text-muted text-xs font-medium tracking-wider uppercase">
+                  Code fournisseur
+                </p>
+                <p className="text-foreground bg-background border-border mt-1 max-w-fit rounded border px-2 py-0.5 font-mono text-sm">
+                  {tier.code_fournisseur || 'Non défini'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

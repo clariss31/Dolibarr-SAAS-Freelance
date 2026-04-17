@@ -41,6 +41,7 @@ export default function EditThirdPartyPage() {
     tva_intra: '',
     idprof2: '',
     code_client: '',
+    code_fournisseur: '',
     t_type: 'client', // Valeur logique interne : client, prospect, fournisseur
   });
 
@@ -81,6 +82,7 @@ export default function EditThirdPartyPage() {
           tva_intra: d.tva_intra || '',
           idprof2: d.idprof2 || '',
           code_client: d.code_client || '',
+          code_fournisseur: d.code_fournisseur || '',
           t_type: deducedType,
         });
       }
@@ -229,18 +231,18 @@ export default function EditThirdPartyPage() {
             </div>
             <div>
               <label
-                htmlFor="code_client"
+                htmlFor="dynamic_code"
                 className="text-foreground mb-2 block text-sm font-medium"
               >
-                Code client
+                {formData.t_type === 'fournisseur' ? 'Code fournisseur' : 'Code client'}
               </label>
               <input
                 type="text"
-                id="code_client"
-                name="code_client"
-                value={formData.code_client}
+                id="dynamic_code"
+                name={formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client'}
+                value={formData.t_type === 'fournisseur' ? formData.code_fournisseur : formData.code_client}
                 onChange={handleChange}
-                placeholder="Ex: CUST-001"
+                placeholder={formData.t_type === 'fournisseur' ? "Ex: SU-001" : "Ex: CUST-001"}
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
               />
             </div>
