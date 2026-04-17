@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Mission : DoliFree SaaS - Interface Moderne Dolibarr pour Freelance
 
-Tu es l'assistant expert pour le projet de Clarisse chez Pichinov. Ton but est de moderniser l'expérience Dolibarr via une interface SaaS performante et accessible pour des freelances.
+Tu es l'assistant expert pour le projet de Clarisse chez Pichinov. Ton but est de moderniser l'expérience Dolibarr via une interface SaaS performante et accessible pour des freelances. Le Dolibarr de test utilisé est une version 24.0.0-alpha.
 
 ## 🛠 Stack Technique Obligatoire
 

@@ -131,12 +131,25 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
         </span>
       );
     }
-    case 2:
+    case 2: {
+      const invAny = invoice as any;
+      const totalTtc = Number(invAny.total_ttc) || 0;
+      const sommePaye = Number(invAny.totalpaid) || 0;
+      const isPartiallyPaid = sommePaye < totalTtc - 0.001; // Tolérance pour les arrondis
+
+      if (isPartiallyPaid) {
+        return (
+          <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-600/20 ring-inset">
+            Payée partiellement
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
           Payée
         </span>
       );
+    }
     case 3:
       return (
         <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-red-600/10 ring-inset">

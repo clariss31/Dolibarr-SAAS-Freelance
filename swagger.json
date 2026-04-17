@@ -1,6 +1,6 @@
 {
   "swagger": "2.0",
-  "host": "erpdev.ridin-family.com:443",
+  "host": "localhost",
   "basePath": "/api/index.php",
   "produces": [
     "application/json",
@@ -4606,6 +4606,14 @@
             "description": "If this parameter is set to true the response will include pagination data. Default value is false. Page starts from 0*",
             "in": "query",
             "required": false
+          },
+          {
+            "name": "loadlinkedobjects",
+            "type": "integer",
+            "format": "int64",
+            "description": "Load also linked object. 0 (default), 1 load linked objects",
+            "in": "query",
+            "required": false
           }
         ],
         "summary": "List Event attendees 🔐",
@@ -6469,7 +6477,7 @@
     },
     "/interventions/{id}/lines/{lineid}": {
       "delete": {
-        "operationId": "interventionsRemoveInterventionalLine",
+        "operationId": "interventionsRemoveLine",
         "tags": [
           "interventions"
         ],
@@ -6478,7 +6486,7 @@
             "name": "id",
             "type": "integer",
             "format": "int64",
-            "description": "ID of the interventional",
+            "description": "ID of the intervention",
             "in": "path",
             "required": true
           },
@@ -6491,7 +6499,7 @@
             "required": true
           }
         ],
-        "summary": "Delete the line of the interventional. 🔐",
+        "summary": "Delete the line of the intervention 🔐",
         "description": "",
         "responses": {
           "200": {
@@ -6500,8 +6508,14 @@
               "$ref": "#/definitions/Obj"
             }
           },
-          "500": {
-            "description": "RestException"
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "405": {
+            "description": "Method Not Allowed"
           }
         },
         "security": [
@@ -6511,7 +6525,7 @@
         ]
       },
       "put": {
-        "operationId": "interventionsUpdateInterventionalLine",
+        "operationId": "interventionsUpdateLine",
         "tags": [
           "interventions"
         ],
@@ -6520,7 +6534,7 @@
             "name": "id",
             "type": "integer",
             "format": "int64",
-            "description": "Id of order to update",
+            "description": "ID of order to update",
             "in": "path",
             "required": true
           },
@@ -6528,31 +6542,37 @@
             "name": "lineid",
             "type": "integer",
             "format": "int64",
-            "description": "Id of line to update",
+            "description": "ID of line to update",
             "in": "path",
             "required": true
           },
           {
-            "name": "interventionsUpdateInterventionalLineModel",
+            "name": "interventionsUpdateLineModel",
             "description": "**request_data** (required)  \n",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/interventionsUpdateInterventionalLineModel"
+              "$ref": "#/definitions/interventionsUpdateLineModel"
             }
           }
         ],
-        "summary": "update the line of the interventional. 🔐",
+        "summary": "Update a line of an intervention 🔐",
         "description": "",
         "responses": {
           "200": {
             "description": "Success",
             "schema": {
-              "type": "string"
+              "$ref": "#/definitions/Obj"
             }
           },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
           "500": {
-            "description": "RestException"
+            "description": "Internal Server Error"
           }
         },
         "security": [
@@ -27710,8 +27730,7 @@
           "200": {
             "description": "Success",
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             }
           }
         },
@@ -30671,14 +30690,14 @@
         "notrigger"
       ]
     },
-    "interventionsUpdateInterventionalLineModel": {
+    "interventionsUpdateLineModel": {
       "properties": {
         "request_data": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "InternventionalLine data"
+          "description": "Intervention line data"
         }
       },
       "required": [

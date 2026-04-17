@@ -76,7 +76,13 @@ function isOverdue(inv: Invoice): boolean {
 /** Retourne le badge coloré correspondant au statut d'une facture Dolibarr.
  * Le statut "Règlement commencé" est un statut logique déduit (statut=1 avec paiements partiels).
  */
-function StatusBadge({ invoice, sommePaye }: { invoice: Invoice; sommePaye: number }) {
+function StatusBadge({
+  invoice,
+  sommePaye,
+}: {
+  invoice: Invoice;
+  sommePaye: number;
+}) {
   // Règlement commencé : facture impayée (statut=1) avec au moins un paiement enregistré
   const isPartiallyPaid = Number(invoice.statut) === 1 && sommePaye > 0;
 
@@ -100,12 +106,23 @@ function StatusBadge({ invoice, sommePaye }: { invoice: Invoice; sommePaye: numb
           Impayée
         </span>
       );
-    case 2:
+    case 2: {
+      const totalTtc = Number(invoice.total_ttc) || 0;
+      const isPartiallyPaidResult = sommePaye < totalTtc - 0.001;
+
+      if (isPartiallyPaidResult) {
+        return (
+          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+            Payée partiellement
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
           Payée
         </span>
       );
+    }
     case 3:
       return (
         <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-300">
@@ -199,6 +216,14 @@ function InvoiceDetailContent({ id }: { id: string }) {
   const [isSubmittingAbandon, setIsSubmittingAbandon] = useState(false);
 
   // ---------------------------------------------------------------------------
+  // États de la Modal de Classement "Payée partiellement"
+  // ---------------------------------------------------------------------------
+  const [showPartialModal, setShowPartialModal] = useState(false);
+  const [partialReason, setPartialReason] = useState('DISCOUNT');
+  const [partialComment, setPartialComment] = useState('');
+  const [isSubmittingPartial, setIsSubmittingPartial] = useState(false);
+
+  // ---------------------------------------------------------------------------
   // Chargement de la facture
   // ---------------------------------------------------------------------------
 
@@ -252,15 +277,41 @@ function InvoiceDetailContent({ id }: { id: string }) {
     if (!id || !endpoint) return;
     const fetchPayments = async () => {
       try {
-        // Uniquement disponible pour les factures client
         if (endpoint === '/invoices') {
           const res = await api.get(`/invoices/${id}/payments`);
           if (Array.isArray(res.data)) {
-            setPayments(res.data);
+            // Tentative de résolution des comptes bancaires manquants via fk_bank_line
+            const resolvedPayments = await Promise.all(
+              res.data.map(async (p: any) => {
+                // Si fk_bank est absent mais fk_bank_line est présent, on cherche le détail de la ligne
+                if (!p.fk_bank && p.fk_bank_line) {
+                  try {
+                    const lineRes = await api.get(
+                      `/bankaccounts/lines/${p.fk_bank_line}`
+                    );
+                    if (
+                      lineRes.data &&
+                      (lineRes.data.fk_account || lineRes.data.fk_bank_account)
+                    ) {
+                      return {
+                        ...p,
+                        fk_bank:
+                          lineRes.data.fk_account ||
+                          lineRes.data.fk_bank_account,
+                      };
+                    }
+                  } catch {
+                    // Si l'appel échoue, on garde le paiement tel quel
+                  }
+                }
+                return p;
+              })
+            );
+            setPayments(resolvedPayments);
           }
         }
       } catch {
-        // Silencieux : certaines versions Dolibarr ne supportent pas cet endpoint
+        // Silencieux
       }
     };
     fetchPayments();
@@ -278,11 +329,11 @@ function InvoiceDetailContent({ id }: { id: string }) {
           }
         }
       } catch (e) {
-        console.error('Erreur chargement comptes bancaires');
+        // Erreur silencieuse pour le chargement initial des banques
       }
     };
     fetchSetup();
-  }, []); // On charge une fois au montage
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Handler de suppression
@@ -340,24 +391,21 @@ function InvoiceDetailContent({ id }: { id: string }) {
     setError('');
 
     try {
-      console.log(`Tentative d'abandon via PUT...`);
-      // Comme votre Swagger ne montre pas d'endpoint d'action pour l'abandon, 
-      // on utilise le PUT générique en envoyant le statut 3 (Abandonnée)
-      // On passe id_reason ET close_code pour être sûr de couvrir toutes les variantes Dolibarr
+      // Tentative d'abandon via PUT générique
+      // Note: On envoie plusieurs variantes de champs (statut, id_reason, close_code)
+      // pour assurer la compatibilité avec différentes versions de l'API Dolibarr.
       await api.put(`${endpoint}/${id}`, {
-        statut: "3",
-        status: "3",
+        statut: '3',
+        status: '3',
         id_reason: abandonReason,
         close_code: abandonReason,
         close_note: abandonComment,
-        note_private: abandonComment // Fallback sécurité
+        note_private: abandonComment,
       });
-      
-      console.log(`✅ Succès de l'abandon via PUT`);
+
       window.location.reload();
     } catch (err: any) {
-      console.error(`❌ Échec de l'abandon via PUT`, err);
-      setError(`Échec de l'abandon. Votre API ne semble pas supporter les actions directes. Erreur finale: ${getErrorMessage(err)}`);
+      setError(`Échec de l'abandon : ${getErrorMessage(err)}`);
       setIsSubmittingAbandon(false);
     }
   };
@@ -379,6 +427,26 @@ function InvoiceDetailContent({ id }: { id: string }) {
     }
   };
 
+  /** Soumet le classement en "Payée (partiellement)" à l'API Dolibarr */
+  const submitPartialPaid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingPartial(true);
+    setError('');
+
+    try {
+      // Pour classer en payée (partiellement), on utilise settopaid avec les codes de clôture
+      await api.post(`${endpoint}/${id}/settopaid`, {
+        close_code: partialReason,
+        close_note: partialComment,
+      });
+
+      window.location.reload();
+    } catch (err: any) {
+      setError(`Échec du classement : ${getErrorMessage(err)}`);
+      setIsSubmittingPartial(false);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Handler du Règlement
   // ---------------------------------------------------------------------------
@@ -386,7 +454,10 @@ function InvoiceDetailContent({ id }: { id: string }) {
   const handleOpenPayment = () => {
     // Pré-remplir avec le reste à payer (TTC - somme des règlements existants)
     const total = Number(invoice?.total_ttc) || 0;
-    const dejaRegle = payments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+    const dejaRegle = payments.reduce(
+      (acc, p) => acc + (Number(p.amount) || 0),
+      0
+    );
     const reste = Math.max(0, total - dejaRegle);
     setPaymentAmount(reste.toFixed(2));
     setShowPaymentModal(true);
@@ -410,27 +481,23 @@ function InvoiceDetailContent({ id }: { id: string }) {
         datepaye: dateSeconds,
         paymentid: Number(paymentMode),
         accountid: Number(paymentAccount),
-        closepaidinvoices: (sommePaye + amountParsed) >= totalTtcComputed ? 'yes' : 'no',
+        closepaidinvoices:
+          sommePaye + amountParsed >= totalTtcComputed ? 'yes' : 'no',
         num_payment: paymentNum || '',
         comment: paymentComment || '',
         chqemetteur: paymentEmitter || '',
         chqbank: paymentBank || '',
         arrayofamounts: {
           [id]: {
-            amount: amountParsed
-          }
-        }
+            amount: amountParsed,
+          },
+        },
       };
 
       await api.post(`${endpoint}/paymentsdistributed`, payload);
       window.location.reload();
     } catch (err: any) {
-      console.group('❌ Erreur paiement');
-      console.warn('err complet :', err);
-      console.warn('err.response.data :', err?.response?.data);
-      console.groupEnd();
-
-      // Extraction propre du message d'erreur de Dolibarr s'il existe
+      // Extraction du message d'erreur spécifique de l'API Dolibarr si disponible
       const apiMessage = err?.response?.data?.error?.message;
       setError(apiMessage || getErrorMessage(err));
       setIsSubmittingPayment(false);
@@ -484,7 +551,10 @@ function InvoiceDetailContent({ id }: { id: string }) {
   const totalTva = Number(invoice.total_tva) || totalTtc - totalHt;
 
   // Calcul du mont déjà réglé et du reste à payer à partir des règlements chargés
-  const sommePaye = payments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+  const sommePaye = payments.reduce(
+    (acc, p) => acc + (Number(p.amount) || 0),
+    0
+  );
   const resteAPayer = Math.max(0, totalTtc - sommePaye);
 
   // Détection du conflit Caisse vs Mode de paiement non-espèce
@@ -569,6 +639,17 @@ function InvoiceDetailContent({ id }: { id: string }) {
               >
                 Abandonner
               </button>
+
+              {/* Bouton Classer Payée partiellement (si règlement commencé) */}
+              {sommePaye > 0 && resteAPayer > 0 && (
+                <button
+                  disabled={isDeleting}
+                  onClick={() => setShowPartialModal(true)}
+                  className="bg-primary hover:bg-primary/90 inline-flex cursor-pointer justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-primary transition-colors ring-inset disabled:opacity-50"
+                >
+                  Classer 'payée partiellement'
+                </button>
+              )}
             </>
           )}
 
@@ -667,50 +748,94 @@ function InvoiceDetailContent({ id }: { id: string }) {
           {/* Tableau des règlements (visible si au moins un paiement enregistré) */}
           {payments.length > 0 && (
             <div className="border-border border-t px-5 pt-4 pb-5">
-              <p className="text-foreground mb-3 text-sm font-semibold">Règlements</p>
+              <p className="text-foreground mb-3 text-sm font-semibold">
+                Règlements
+              </p>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-muted text-xs uppercase">
-                      <th className="pb-2 pr-4 text-left font-medium">Date</th>
-                      <th className="pb-2 pr-4 text-left font-medium">Type</th>
-                      <th className="pb-2 pr-4 text-left font-medium">Compte bancaire</th>
+                      <th className="pr-4 pb-2 text-left font-medium">Date</th>
+                      <th className="pr-4 pb-2 text-left font-medium">Type</th>
+                      <th className="pr-4 pb-2 text-left font-medium">
+                        Compte bancaire
+                      </th>
                       <th className="pb-2 text-right font-medium">Montant</th>
                     </tr>
                   </thead>
                   <tbody className="divide-border divide-y">
-                      {payments.map((p, idx) => {
-                        // Résolution de la date (Dolibarr utilise datep, datepaye, date ou date_creation)
-                        const pDate = p.datepaye ?? (p as any).datep ?? (p as any).date ?? (p as any).date_creation;
+                    {payments.map((p, idx) => {
+                      // Résolution de la date (Dolibarr utilise datep, datepaye, date ou date_creation)
+                      const pDate =
+                        p.datepaye ??
+                        (p as any).datep ??
+                        (p as any).date ??
+                        (p as any).date_creation;
 
-                        // Résolution du libellé du mode de paiement
-                        const pMode = String(p.type ?? p.paiementid ?? p.paiementcode ?? (p as any).type_id ?? (p as any).type_code ?? '');
-                        const modeMapping: Record<string, string> = {
-                          '6': 'Carte bancaire', 'CB': 'Carte bancaire',
-                          '3': 'Chèque', 'CHQ': 'Chèque',
-                          '4': 'Espèce', 'LIQ': 'Espèce',
-                          '7': 'Ordre de prélèvement', 'PRE': 'Ordre de prélèvement',
-                          '2': 'Virement bancaire', 'VIR': 'Virement bancaire'
-                        };
-                        
-                        const modeLabel = modeMapping[pMode] ?? 
-                          paymentModes.find(m => String(m.id) === pMode)?.label ??
-                          p.paiementcode ?? 
-                          (p as any).paiement_type_label ?? 
-                          (p.paiementid ? `Mode #${p.paiementid}` : '-');
+                      // Résolution du libellé du mode de paiement
+                      const pMode = String(
+                        p.type ??
+                          p.paiementid ??
+                          p.paiementcode ??
+                          (p as any).type_id ??
+                          (p as any).type_code ??
+                          ''
+                      );
+                      const modeMapping: Record<string, string> = {
+                        '6': 'Carte bancaire',
+                        CB: 'Carte bancaire',
+                        '3': 'Chèque',
+                        CHQ: 'Chèque',
+                        '4': 'Espèce',
+                        LIQ: 'Espèce',
+                        '7': 'Ordre de prélèvement',
+                        PRE: 'Ordre de prélèvement',
+                        '2': 'Virement bancaire',
+                        VIR: 'Virement bancaire',
+                      };
 
-                        // Résolution du libellé du compte bancaire (plusieurs noms de champs possibles)
-                        const pBankId = String(p.fk_bank ?? (p as any).fk_account ?? (p as any).account_id ?? (p as any).fk_bank_account ?? '');
-                        
-                        // Si on n'a toujours pas d'ID de banque sur le paiement, on tente d'utiliser celui par défaut de la facture
-                        const finalBankId = pBankId || String(invoice.fk_account ?? '');
+                      const modeLabel =
+                        modeMapping[pMode] ??
+                        paymentModes.find((m) => String(m.id) === pMode)
+                          ?.label ??
+                        p.paiementcode ??
+                        (p as any).paiement_type_label ??
+                        (p.paiementid ? `Mode #${p.paiementid}` : '-');
 
-                        const bankLabel =
-                          bankAccounts.find(b => String(b.id) === finalBankId)?.label ??
-                          bankAccounts.find(b => String(b.id) === finalBankId)?.ref ??
-                          p.bank_account ??
-                          (p as any).bank_label ??
-                          (finalBankId ? `Compte #${finalBankId}` : '-');
+                      // Résolution du libellé du compte bancaire (plusieurs noms de champs possibles selon la version Dolibarr)
+                      const pBankId = String(
+                        p.fk_bank ??
+                          (p as any).fk_account ??
+                          (p as any).account_id ??
+                          (p as any).fk_bank_account ??
+                          (p as any).fk_account_bank ??
+                          ''
+                      );
+
+                      // Si on n'a toujours pas d'ID de banque sur le règlement, on tente d'utiliser celui par défaut de la facture
+                      const invoiceBankId = String(
+                        invoice.fk_account ??
+                          (invoice as any).fk_bank ??
+                          (invoice as any).account_id ??
+                          ''
+                      );
+                      const finalBankId = pBankId || invoiceBankId;
+
+                      const bankLabel =
+                        bankAccounts.find(
+                          (b) => String(b.id || b.rowid) === finalBankId
+                        )?.label ??
+                        bankAccounts.find(
+                          (b) => String(b.id || b.rowid) === finalBankId
+                        )?.ref ??
+                        (p as any).bank_ref ??
+                        (p as any).account_ref ??
+                        (p as any).bank_label ??
+                        (p as any).account_label ??
+                        p.bank_account ??
+                        (finalBankId && finalBankId !== '0'
+                          ? `Compte #${finalBankId}`
+                          : '-');
 
                       return (
                         <tr
@@ -739,16 +864,28 @@ function InvoiceDetailContent({ id }: { id: string }) {
               {/* Récapitulatif déjà réglé / reste à payer */}
               <div className="border-border mt-3 space-y-1 border-t pt-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted">Déjà réglé (hors avoirs et acomptes)</span>
-                  <span className="text-foreground font-medium">{formatCurrency(sommePaye)}</span>
+                  <span className="text-muted">
+                    Déjà réglé (hors avoirs et acomptes)
+                  </span>
+                  <span className="text-foreground font-medium">
+                    {formatCurrency(sommePaye)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted">Facturée</span>
-                  <span className="text-foreground font-medium">{formatCurrency(totalTtc)}</span>
+                  <span className="text-foreground font-medium">
+                    {formatCurrency(totalTtc)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-base font-bold">
                   <span className="text-foreground">Reste à payer</span>
-                  <span className={resteAPayer > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                  <span
+                    className={
+                      resteAPayer > 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-emerald-600 dark:text-emerald-400'
+                    }
+                  >
                     {formatCurrency(resteAPayer)}
                   </span>
                 </div>
@@ -1057,62 +1194,81 @@ function InvoiceDetailContent({ id }: { id: string }) {
       {showAbandonModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl transition-all">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h3 className="text-xl font-bold text-foreground">Annuler la facture</h3>
+            <div className="border-border flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-foreground text-xl font-bold">
+                Annuler la facture
+              </h3>
               <button
                 onClick={() => setShowAbandonModal(false)}
                 className="text-muted hover:text-foreground transition-colors"
                 aria-label="Fermer"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
 
-            <form onSubmit={submitAbandon} className="p-6 space-y-6">
-              <p className="text-sm text-foreground">
+            <form onSubmit={submitAbandon} className="space-y-6 p-6">
+              <p className="text-foreground text-sm">
                 Pour quelle raison voulez-vous classer la facture abandonnée ?
               </p>
 
               <div className="space-y-3">
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="radio"
                     name="abandonReason"
                     value="BADDEBT"
                     checked={abandonReason === 'BADDEBT'}
                     onChange={(e) => setAbandonReason(e.target.value)}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
-                  <span className="text-sm text-foreground">Mauvais payeur</span>
+                  <span className="text-foreground text-sm">
+                    Mauvais payeur
+                  </span>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="radio"
                     name="abandonReason"
                     value="REPL"
                     checked={abandonReason === 'REPL'}
                     onChange={(e) => setAbandonReason(e.target.value)}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
-                  <span className="text-sm text-foreground">Remplacement par une autre facture</span>
+                  <span className="text-foreground text-sm">
+                    Remplacement par une autre facture
+                  </span>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="radio"
                     name="abandonReason"
                     value="OTHER"
                     checked={abandonReason === 'OTHER'}
                     onChange={(e) => setAbandonReason(e.target.value)}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
-                  <span className="text-sm text-foreground">Autre</span>
+                  <span className="text-foreground text-sm">Autre</span>
                 </label>
               </div>
 
               <div>
-                <label htmlFor="abandonComment" className="block text-sm font-medium text-foreground mb-1">
+                <label
+                  htmlFor="abandonComment"
+                  className="text-foreground mb-1 block text-sm font-medium"
+                >
                   Commentaire
                 </label>
                 <textarea
@@ -1121,16 +1277,28 @@ function InvoiceDetailContent({ id }: { id: string }) {
                   value={abandonComment}
                   onChange={(e) => setAbandonComment(e.target.value)}
                   placeholder="Expliquez brièvement la raison..."
-                  className="block w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none dark:text-white"
+                  className="border-border bg-background focus:ring-primary block w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none dark:text-white"
                 />
               </div>
 
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
-                <svg className="h-5 w-5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                <svg
+                  className="mt-0.5 h-5 w-5 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
                 </svg>
                 <p>
-                  Êtes-vous sûr de vouloir annuler la facture <strong>{invoice.ref}</strong> ? Cette action est irréversible.
+                  Êtes-vous sûr de vouloir annuler la facture{' '}
+                  <strong>{invoice.ref}</strong> ? Cette action est
+                  irréversible.
                 </p>
               </div>
 
@@ -1138,14 +1306,165 @@ function InvoiceDetailContent({ id }: { id: string }) {
                 <button
                   type="submit"
                   disabled={isSubmittingAbandon}
-                  className="inline-flex justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                  className="inline-flex justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:outline-none disabled:opacity-50"
                 >
                   {isSubmittingAbandon ? 'Traitement...' : 'Oui, abandonner'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAbandonModal(false)}
-                  className="inline-flex justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 dark:hover:bg-gray-700"
+                  className="inline-flex justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 dark:hover:bg-gray-700"
+                >
+                  Non
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL : CLASSER PAYÉE (PARTIELLEMENT) */}
+      {showPartialModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl transition-all">
+            <div className="border-border flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-foreground text-xl font-bold">
+                Classer 'Payée' (partiellement)
+              </h3>
+              <button
+                onClick={() => setShowPartialModal(false)}
+                className="text-muted hover:text-foreground transition-colors"
+                title="Fermer"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={submitPartialPaid} className="space-y-6 p-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-800 dark:text-blue-300">
+                <p className="font-semibold mb-1">Attention</p>
+                <p>
+                  Cette facture n'a pas été payée à hauteur du montant initial. 
+                  Pour quelle raison voulez-vous la classer malgré tout ? 
+                  Le reste à payer est de <strong>{formatCurrency(resteAPayer)}</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="partialReason"
+                    value="DISCOUNT"
+                    checked={partialReason === 'DISCOUNT'}
+                    onChange={(e) => setPartialReason(e.target.value)}
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
+                  />
+                  <div className="text-sm">
+                    <p className="text-foreground font-medium">Escompte accordé</p>
+                    <p className="text-muted text-xs">Paiement effectué avant terme.</p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="partialReason"
+                    value="BADDEBT"
+                    checked={partialReason === 'BADDEBT'}
+                    onChange={(e) => setPartialReason(e.target.value)}
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
+                  />
+                  <div className="text-sm">
+                    <p className="text-foreground font-medium">Mauvais payeur</p>
+                    <p className="text-muted text-xs">Dette irrécouvrable.</p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="partialReason"
+                    value="BANKFEE"
+                    checked={partialReason === 'BANKFEE'}
+                    onChange={(e) => setPartialReason(e.target.value)}
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
+                  />
+                  <div className="text-sm">
+                    <p className="text-foreground font-medium">Prélèvement par banque</p>
+                    <p className="text-muted text-xs">Frais de banque intermédiaire.</p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="partialReason"
+                    value="TAX"
+                    checked={partialReason === 'TAX'}
+                    onChange={(e) => setPartialReason(e.target.value)}
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
+                  />
+                  <div className="text-sm">
+                    <p className="text-foreground font-medium">Taxe retenue à la source</p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="radio"
+                    name="partialReason"
+                    value="OTHER"
+                    checked={partialReason === 'OTHER'}
+                    onChange={(e) => setPartialReason(e.target.value)}
+                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
+                  />
+                  <div className="text-sm">
+                    <p className="text-foreground font-medium">Autre</p>
+                  </div>
+                </label>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="partialComment"
+                  className="text-foreground mb-1 block text-sm font-medium"
+                >
+                  Commentaire / Note de clôture
+                </label>
+                <textarea
+                  id="partialComment"
+                  rows={3}
+                  value={partialComment}
+                  onChange={(e) => setPartialComment(e.target.value)}
+                  placeholder="Informations complémentaires..."
+                  className="border-border bg-background focus:ring-primary block w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none dark:text-white dark:bg-gray-800"
+                />
+              </div>
+
+              <div className="flex flex-row-reverse gap-3 border-t border-border pt-6">
+                <button
+                  type="submit"
+                  disabled={isSubmittingPartial}
+                  className="inline-flex justify-center rounded-md bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus:ring-2 focus:ring-primary focus:outline-none disabled:opacity-50"
+                >
+                  {isSubmittingPartial ? 'Traitement...' : 'Oui, classer payée'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPartialModal(false)}
+                  className="inline-flex justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 dark:hover:bg-gray-700"
                 >
                   Non
                 </button>
