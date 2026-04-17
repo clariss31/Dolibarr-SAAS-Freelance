@@ -107,8 +107,9 @@ function StatusBadge({
         </span>
       );
     case 2: {
-      const totalTtc = Number(invoice.total_ttc) || 0;
-      const isPartiallyPaidResult = sommePaye < totalTtc - 0.001;
+      const totalTtc = Math.round((Number(invoice.total_ttc) || 0) * 100) / 100;
+      const payeArrondi = Math.round(sommePaye * 100) / 100;
+      const isPartiallyPaidResult = payeArrondi < totalTtc - 0.01;
 
       if (isPartiallyPaidResult) {
         return (
@@ -203,6 +204,8 @@ function InvoiceDetailContent({ id }: { id: string }) {
     { id: 2, label: 'Virement bancaire' },
   ]);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [paymentAttempted, setPaymentAttempted] = useState(false);
+  const [paymentModalError, setPaymentModalError] = useState('');
 
   // Liste des règlements rattachés à la facture
   const [payments, setPayments] = useState<InvoicePayment[]>([]);
@@ -465,8 +468,22 @@ function InvoiceDetailContent({ id }: { id: string }) {
 
   const submitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPaymentAttempted(true);
+    setPaymentModalError('');
+
+    // Vérification de la cohérence Caisse / Mode de règlement
+    const selectedBank = bankAccounts.find(
+      (b) => String(b.id) === paymentAccount
+    );
+    const isMismatch =
+      selectedBank && isCashAccount(selectedBank) && paymentMode !== '4';
+
+    if (isMismatch) {
+      // On arrête la soumission si incohérent
+      return;
+    }
+
     setIsSubmittingPayment(true);
-    setError('');
 
     try {
       const amountParsed = parseFloat(paymentAmount.replace(',', '.'));
@@ -477,37 +494,56 @@ function InvoiceDetailContent({ id }: { id: string }) {
       const totalTtcComputed = Number(invoice?.total_ttc) || 0;
       const dateSeconds = Math.floor(new Date(paymentDate).getTime() / 1000);
 
-      const payload = {
-        datepaye: dateSeconds,
-        paymentid: Number(paymentMode),
-        accountid: Number(paymentAccount),
-        closepaidinvoices:
-          sommePaye + amountParsed >= totalTtcComputed ? 'yes' : 'no',
-        num_payment: paymentNum || '',
-        comment: paymentComment || '',
-        chqemetteur: paymentEmitter || '',
-        chqbank: paymentBank || '',
-        arrayofamounts: {
-          [id]: {
-            amount: amountParsed,
+      // Branchement selon le type de facture (Client vs Fournisseur)
+      if (typeParam === 'supplier') {
+        const payload = {
+          datepaye: dateSeconds,
+          payment_mode_id: Number(paymentMode),
+          accountid: Number(paymentAccount),
+          closepaidinvoices:
+            sommePaye + amountParsed >= totalTtcComputed ? 'yes' : 'no',
+          num_payment: paymentNum || '',
+          comment: paymentComment || '',
+          chqemetteur: paymentEmitter || '',
+          chqbank: paymentBank || '',
+          amount: amountParsed,
+        };
+        // Pour les fournisseurs, l'endpoint est propre à la facture : /supplierinvoices/{id}/payments
+        await api.post(`/supplierinvoices/${id}/payments`, payload);
+      } else {
+        const payload = {
+          datepaye: dateSeconds,
+          paymentid: Number(paymentMode),
+          accountid: Number(paymentAccount),
+          closepaidinvoices:
+            sommePaye + amountParsed >= totalTtcComputed ? 'yes' : 'no',
+          num_payment: paymentNum || '',
+          comment: paymentComment || '',
+          chqemetteur: paymentEmitter || '',
+          chqbank: paymentBank || '',
+          arrayofamounts: {
+            [id]: {
+              amount: amountParsed,
+            },
           },
-        },
-      };
+        };
+        // Pour les clients, on utilise l'endpoint global de distribution
+        await api.post('/invoices/paymentsdistributed', payload);
+      }
 
-      await api.post(`${endpoint}/paymentsdistributed`, payload);
       window.location.reload();
     } catch (err: any) {
-      // Extraction du message d'erreur spécifique de l'API Dolibarr si disponible
       const apiMessage = err?.response?.data?.error?.message;
-      setError(apiMessage || getErrorMessage(err));
+      setPaymentModalError(apiMessage || getErrorMessage(err));
       setIsSubmittingPayment(false);
-      setShowPaymentModal(false);
     }
   };
 
   const closeModal = () => {
     setShowPaymentModal(false);
     setIsSubmittingPayment(false);
+    setPaymentAttempted(false);
+    setPaymentModalError('');
   };
 
   // ---------------------------------------------------------------------------
@@ -645,7 +681,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                 <button
                   disabled={isDeleting}
                   onClick={() => setShowPartialModal(true)}
-                  className="bg-primary hover:bg-primary/90 inline-flex cursor-pointer justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-primary transition-colors ring-inset disabled:opacity-50"
+                  className="bg-primary hover:bg-primary/90 ring-primary text-background inline-flex cursor-pointer justify-center rounded-md px-3 py-2 text-sm font-semibold shadow-sm ring-1 transition-colors ring-inset disabled:opacity-50"
                 >
                   Classer 'payée partiellement'
                 </button>
@@ -1006,10 +1042,17 @@ function InvoiceDetailContent({ id }: { id: string }) {
                 </h3>
               </div>
 
-              {/* Message d'erreur Dolibarr si incompatibilité sélection Caisse/Mode */}
-              {showMismatchError && (
-                <div className="mx-6 mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset">
-                  {mismatchErrorMessage}
+              {/* Message d'erreur Dolibarr si incompatibilité sélection Caisse/Mode - seulement après tentative de validation */}
+              {paymentAttempted && showMismatchError && (
+                <div className="mx-6 mt-4 rounded-md border border-red-800/10 bg-red-900/30 p-4 text-sm text-red-400">
+                  <p>{mismatchErrorMessage}</p>
+                </div>
+              )}
+
+              {/* Erreur API directe dans la modal */}
+              {paymentModalError && (
+                <div className="mx-6 mt-4 rounded-md border border-red-800/10 bg-red-900/30 p-4 text-sm text-red-400">
+                  <p>{paymentModalError}</p>
                 </div>
               )}
 
@@ -1056,7 +1099,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     htmlFor="payBank"
                     className="text-foreground block text-sm font-medium"
                   >
-                    Compte bancaire à créditer
+                    {typeParam === 'supplier' ? 'Compte' : 'Compte bancaire à créditer'}
                   </label>
                   <select
                     id="payBank"
@@ -1091,53 +1134,43 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     placeholder="Ex: CHQ123456"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      htmlFor="payEmitter"
-                      className="text-foreground block text-sm font-medium"
-                    >
-                      Émetteur
-                    </label>
-                    <input
-                      type="text"
-                      id="payEmitter"
-                      value={paymentEmitter}
-                      onChange={(e) => setPaymentEmitter(e.target.value)}
-                      className="focus:ring-primary mt-1 block w-full rounded-md border px-3 py-2 text-sm ring-1 ring-gray-300 focus:ring-2 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
-                    />
+                {/* Champs émetteur/banque : masqués pour fournisseurs, toujours affichés pour clients */}
+                {typeParam !== 'supplier' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label
+                        htmlFor="payEmitter"
+                        className="text-foreground block text-sm font-medium"
+                      >
+                        Émetteur
+                      </label>
+                      <input
+                        type="text"
+                        id="payEmitter"
+                        value={paymentEmitter}
+                        onChange={(e) => setPaymentEmitter(e.target.value)}
+                        className="focus:ring-primary mt-1 block w-full rounded-md border px-3 py-2 text-sm ring-1 ring-gray-300 focus:ring-2 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="payBankName"
+                        className="text-foreground block text-sm font-medium"
+                      >
+                        Banque
+                      </label>
+                      <input
+                        type="text"
+                        id="payBankName"
+                        value={paymentBank}
+                        onChange={(e) => setPaymentBank(e.target.value)}
+                        className="focus:ring-primary mt-1 block w-full rounded-md border px-3 py-2 text-sm ring-1 ring-gray-300 focus:ring-2 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="payBankName"
-                      className="text-foreground block text-sm font-medium"
-                    >
-                      Banque
-                    </label>
-                    <input
-                      type="text"
-                      id="payBankName"
-                      value={paymentBank}
-                      onChange={(e) => setPaymentBank(e.target.value)}
-                      className="focus:ring-primary mt-1 block w-full rounded-md border px-3 py-2 text-sm ring-1 ring-gray-300 focus:ring-2 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label
-                    htmlFor="payComment"
-                    className="text-foreground block text-sm font-medium"
-                  >
-                    Commentaires
-                  </label>
-                  <textarea
-                    id="payComment"
-                    rows={2}
-                    value={paymentComment}
-                    onChange={(e) => setPaymentComment(e.target.value)}
-                    className="focus:ring-primary mt-1 block w-full rounded-md border px-3 py-2 text-sm ring-1 ring-gray-300 focus:ring-2 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
-                  />
-                </div>
+                )}
+
+                {/* Champ Montant : toujours affiché */}
                 <div>
                   <label
                     htmlFor="payAmount"
@@ -1161,17 +1194,29 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     </div>
                   </div>
                 </div>
+                <div>
+                  <label
+                    htmlFor="payComment"
+                    className="text-foreground block text-sm font-medium"
+                  >
+                    Commentaires
+                  </label>
+                  <textarea
+                    id="payComment"
+                    rows={2}
+                    value={paymentComment}
+                    onChange={(e) => setPaymentComment(e.target.value)}
+                    className="focus:ring-primary mt-1 block w-full rounded-md border px-3 py-2 text-sm ring-1 ring-gray-300 focus:ring-2 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
+                  />
+                </div>
               </div>
               <div className="flex flex-row-reverse gap-3 rounded-b-xl bg-gray-50 px-6 py-4 dark:bg-gray-800">
                 <button
                   type="submit"
                   disabled={
-                    isSubmittingPayment ||
-                    !paymentAccount ||
-                    !paymentMode ||
-                    !!showMismatchError
+                    isSubmittingPayment || !paymentAccount || !paymentMode
                   }
-                  className="btn-primary inline-flex justify-center rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
+                  className="btn-primary px-4 py-2 shadow-sm transition-all disabled:opacity-50"
                 >
                   {isSubmittingPayment
                     ? 'Enregistrement...'
@@ -1352,12 +1397,13 @@ function InvoiceDetailContent({ id }: { id: string }) {
             </div>
 
             <form onSubmit={submitPartialPaid} className="space-y-6 p-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-800 dark:text-blue-300">
-                <p className="font-semibold mb-1">Attention</p>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+                <p className="mb-1 font-semibold">Attention</p>
                 <p>
-                  Cette facture n'a pas été payée à hauteur du montant initial. 
-                  Pour quelle raison voulez-vous la classer malgré tout ? 
-                  Le reste à payer est de <strong>{formatCurrency(resteAPayer)}</strong>.
+                  Cette facture n'a pas été payée à hauteur du montant initial.
+                  Pour quelle raison voulez-vous la classer malgré tout ? Le
+                  reste à payer est de{' '}
+                  <strong>{formatCurrency(resteAPayer)}</strong>.
                 </p>
               </div>
 
@@ -1372,8 +1418,12 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
                   <div className="text-sm">
-                    <p className="text-foreground font-medium">Escompte accordé</p>
-                    <p className="text-muted text-xs">Paiement effectué avant terme.</p>
+                    <p className="text-foreground font-medium">
+                      Escompte accordé
+                    </p>
+                    <p className="text-muted text-xs">
+                      Paiement effectué avant terme.
+                    </p>
                   </div>
                 </label>
 
@@ -1387,7 +1437,9 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
                   <div className="text-sm">
-                    <p className="text-foreground font-medium">Mauvais payeur</p>
+                    <p className="text-foreground font-medium">
+                      Mauvais payeur
+                    </p>
                     <p className="text-muted text-xs">Dette irrécouvrable.</p>
                   </div>
                 </label>
@@ -1402,8 +1454,12 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
                   <div className="text-sm">
-                    <p className="text-foreground font-medium">Prélèvement par banque</p>
-                    <p className="text-muted text-xs">Frais de banque intermédiaire.</p>
+                    <p className="text-foreground font-medium">
+                      Prélèvement par banque
+                    </p>
+                    <p className="text-muted text-xs">
+                      Frais de banque intermédiaire.
+                    </p>
                   </div>
                 </label>
 
@@ -1417,7 +1473,9 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
                   <div className="text-sm">
-                    <p className="text-foreground font-medium">Taxe retenue à la source</p>
+                    <p className="text-foreground font-medium">
+                      Taxe retenue à la source
+                    </p>
                   </div>
                 </label>
 
@@ -1449,15 +1507,15 @@ function InvoiceDetailContent({ id }: { id: string }) {
                   value={partialComment}
                   onChange={(e) => setPartialComment(e.target.value)}
                   placeholder="Informations complémentaires..."
-                  className="border-border bg-background focus:ring-primary block w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none dark:text-white dark:bg-gray-800"
+                  className="border-border bg-background focus:ring-primary block w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none dark:bg-gray-800 dark:text-white"
                 />
               </div>
 
-              <div className="flex flex-row-reverse gap-3 border-t border-border pt-6">
+              <div className="border-border flex flex-row-reverse gap-3 border-t pt-6">
                 <button
                   type="submit"
                   disabled={isSubmittingPartial}
-                  className="inline-flex justify-center rounded-md bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus:ring-2 focus:ring-primary focus:outline-none disabled:opacity-50"
+                  className="btn-primary px-5 py-2 transition-all disabled:opacity-50"
                 >
                   {isSubmittingPartial ? 'Traitement...' : 'Oui, classer payée'}
                 </button>
