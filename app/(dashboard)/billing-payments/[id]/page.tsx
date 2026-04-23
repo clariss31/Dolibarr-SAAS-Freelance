@@ -415,10 +415,6 @@ function InvoiceDetailContent({ id }: { id: string }) {
 
   /** Rouvre une facture abandonnée (repasse en impayée) */
   const handleReopen = async () => {
-    if (
-      !window.confirm('Rouvrir cette facture ? Elle sera reclassée en impayée.')
-    )
-      return;
     setIsDeleting(true);
     setError('');
     try {
@@ -606,10 +602,12 @@ function InvoiceDetailContent({ id }: { id: string }) {
   const dueDateRaw =
     invoice.datelimit ?? invoice.date_lim_reglement ?? invoice.date_echeance;
 
+  const hasLines = (invoice.lines?.length ?? 0) > 0;
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center">
+      <div className="flex items-center justify-between">
         <button
           onClick={() => router.push('/billing-payments')}
           className="text-muted hover:text-foreground text-sm transition-colors hover:underline"
@@ -618,7 +616,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
         </button>
       </div>
 
-      {/* En-tête : référence, statut et actions */}
+      {/* Header : Titre, Statut et Actions */}
       <div className="border-border border-b py-2 sm:flex sm:items-center sm:justify-between">
         <div className="flex items-center space-x-4">
           <h1 className="text-foreground text-3xl font-bold tracking-tight">
@@ -632,13 +630,15 @@ function InvoiceDetailContent({ id }: { id: string }) {
           {/* Si Brouillon (0) on peut Modifier, Valider, Supprimer */}
           {isDraft && (
             <>
-              <button
-                disabled={isDeleting}
-                onClick={handleValidate}
-                className="inline-flex cursor-pointer justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-600 transition-colors ring-inset hover:bg-emerald-700 disabled:opacity-50"
-              >
-                Valider
-              </button>
+              {hasLines && (
+                <button
+                  disabled={isDeleting}
+                  onClick={handleValidate}
+                  className="inline-flex cursor-pointer justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-600 transition-colors ring-inset hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  Valider
+                </button>
+              )}
               <button
                 disabled={isDeleting}
                 onClick={() =>
@@ -653,7 +653,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                 onClick={handleDelete}
                 className="text-sm font-semibold text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
               >
-                {isDeleting && isDraft ? 'Action...' : 'Supprimer'}
+                {isDeleting && isDraft ? '...' : 'Supprimer'}
               </button>
             </>
           )}
@@ -933,93 +933,104 @@ function InvoiceDetailContent({ id }: { id: string }) {
 
       {/* Lignes de la facture */}
       <div className="border-border bg-surface mt-8 overflow-hidden rounded-xl border shadow-sm">
-        <div className="border-border bg-background border-b px-5 py-4">
-          <h3 className="text-foreground text-base leading-6 font-semibold">
-            Lignes de la facture
-          </h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="divide-border min-w-full divide-y">
-            <thead className="bg-background">
-              <tr>
-                <th
-                  scope="col"
-                  className="text-foreground w-[45%] py-3.5 pr-3 pl-4 text-left text-sm font-semibold sm:pl-6"
-                >
-                  Description
-                </th>
-                <th
-                  scope="col"
-                  className="text-foreground px-3 py-3.5 text-center text-sm font-semibold"
-                >
-                  TVA
-                </th>
-                <th
-                  scope="col"
-                  className="text-foreground px-3 py-3.5 text-right text-sm font-semibold"
-                >
-                  P.U. HT
-                </th>
-                <th
-                  scope="col"
-                  className="text-foreground px-3 py-3.5 text-center text-sm font-semibold"
-                >
-                  Qté
-                </th>
-                <th
-                  scope="col"
-                  className="text-foreground px-3 py-3.5 text-right text-sm font-semibold"
-                >
-                  Total HT
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-border bg-surface divide-y">
-              {!invoice.lines?.length ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="text-muted py-6 text-center text-sm italic"
-                  >
-                    Aucune ligne pour cette facture
-                  </td>
-                </tr>
-              ) : (
-                invoice.lines.map((line, idx) => {
-                  const lineId = line.id ?? line.rowid ?? `line-${idx}`;
-                  const description =
-                    line.label ?? line.description ?? line.product_label ?? '-';
-                  const tva = Number(line.tva_tx) || 0;
-                  const puHt = Number(line.subprice) || 0;
-                  const qty = Number(line.qty) || 1;
-                  const lineTotalHt = Number(line.total_ht) || puHt * qty;
-
-                  return (
-                    <tr
-                      key={lineId}
-                      className="hover:bg-background/50 transition-colors"
+        <div className="p-0 sm:p-5">
+          {hasLines ? (
+            <div className="border-border overflow-x-auto rounded-xl border">
+              <table className="divide-border min-w-full divide-y">
+                <thead className="bg-background">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="text-foreground w-[45%] py-3.5 pr-3 pl-4 text-left text-sm font-semibold sm:pl-6"
                     >
-                      <td className="text-foreground py-4 pr-3 pl-4 align-top text-sm sm:pl-6">
-                        <div className="whitespace-pre-wrap">{description}</div>
-                      </td>
-                      <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
-                        {tva}%
-                      </td>
-                      <td className="text-muted px-3 py-4 text-right align-top text-sm whitespace-nowrap">
-                        {formatCurrency(puHt)}
-                      </td>
-                      <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
-                        {qty}
-                      </td>
-                      <td className="text-foreground px-3 py-4 text-right align-top text-sm font-medium whitespace-nowrap">
-                        {formatCurrency(lineTotalHt)}
-                      </td>
-                    </tr>
-                  );
-                })
+                      Description
+                    </th>
+                    <th
+                      scope="col"
+                      className="text-foreground px-3 py-3.5 text-center text-sm font-semibold"
+                    >
+                      TVA
+                    </th>
+                    <th
+                      scope="col"
+                      className="text-foreground px-3 py-3.5 text-right text-sm font-semibold"
+                    >
+                      P.U. HT
+                    </th>
+                    <th
+                      scope="col"
+                      className="text-foreground px-3 py-3.5 text-center text-sm font-semibold"
+                    >
+                      Qté
+                    </th>
+                    <th
+                      scope="col"
+                      className="text-foreground px-3 py-3.5 text-right text-sm font-semibold"
+                    >
+                      Total HT
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-border bg-surface divide-y">
+                  {invoice.lines!.map((line, idx) => {
+                    const lineId = line.id ?? line.rowid ?? `line-${idx}`;
+                    const description =
+                      line.label ??
+                      line.description ??
+                      line.product_label ??
+                      '-';
+                    const tva = Number(line.tva_tx) || 0;
+                    const puHt = Number(line.subprice) || 0;
+                    const qty = Number(line.qty) || 1;
+                    const lineTotalHt = Number(line.total_ht) || puHt * qty;
+
+                    return (
+                      <tr
+                        key={lineId}
+                        className="hover:bg-background/50 transition-colors"
+                      >
+                        <td className="text-foreground py-4 pr-3 pl-4 align-top text-sm sm:pl-6">
+                          <div className="whitespace-pre-wrap">
+                            {description}
+                          </div>
+                        </td>
+                        <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
+                          {tva}%
+                        </td>
+                        <td className="text-muted px-3 py-4 text-right align-top text-sm whitespace-nowrap">
+                          {formatCurrency(puHt)}
+                        </td>
+                        <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
+                          {qty}
+                        </td>
+                        <td className="text-foreground px-3 py-4 text-right align-top text-sm font-medium whitespace-nowrap">
+                          {formatCurrency(lineTotalHt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-muted bg-surface/50 border-border mx-5 rounded-xl border border-dashed py-12 text-center text-sm italic sm:mx-0">
+              Aucune ligne enregistrée sur cette facture.
+              {isDraft && (
+                <p className="mt-2">
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/billing-payments/${id}/edit?type=${typeParam}`
+                      )
+                    }
+                    className="text-primary font-medium hover:underline"
+                  >
+                    Ajouter des lignes →
+                  </button>
+                </p>
               )}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1099,7 +1110,9 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     htmlFor="payBank"
                     className="text-foreground block text-sm font-medium"
                   >
-                    {typeParam === 'supplier' ? 'Compte' : 'Compte bancaire à créditer'}
+                    {typeParam === 'supplier'
+                      ? 'Compte'
+                      : 'Compte bancaire à créditer'}
                   </label>
                   <select
                     id="payBank"

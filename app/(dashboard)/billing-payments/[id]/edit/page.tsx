@@ -185,7 +185,11 @@ function EditInvoiceContent({ id }: { id: string }) {
         setInvoiceRef(invoice.ref);
         setFormData({
           date: timestampToDateString(invoice.date),
-          datelimit: timestampToDateString(invoice.datelimit ?? invoice.date_lim_reglement ?? invoice.date_echeance),
+          datelimit: timestampToDateString(
+            invoice.datelimit ??
+              invoice.date_lim_reglement ??
+              invoice.date_echeance
+          ),
         });
 
         // Chargement des lignes : payload d'abord, repli endpoint dédié ensuite
@@ -416,7 +420,7 @@ function EditInvoiceContent({ id }: { id: string }) {
               htmlFor="datelimit"
               className="text-foreground block text-sm font-medium"
             >
-              Date limite (Échéance)
+              Date limite règlement
             </label>
             <div className="mt-2">
               <input

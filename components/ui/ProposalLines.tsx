@@ -66,15 +66,17 @@ export default function ProposalLines({
   // Sélections de la ligne en cours d'ajout
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedQty, setSelectedQty] = useState<number>(1);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const productSelectId = useId();
+  const searchInputId = useId();
   const qtyInputId = useId();
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await api.get(
-          '/products?sortfield=t.label&sortorder=ASC&limit=500&mode=1'
+          '/products?sortfield=t.label&sortorder=ASC&limit=1000&mode=0'
         );
         if (response.data && Array.isArray(response.data)) {
           setProducts(response.data as Product[]);
@@ -126,6 +128,7 @@ export default function ProposalLines({
 
     onChange([...lines, newLine]);
     setSelectedProductId('');
+    setSearchQuery('');
     setSelectedQty(1);
   };
 
@@ -160,6 +163,19 @@ export default function ProposalLines({
     onChange(lines.filter((l) => l._key !== key));
   };
 
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const filteredProducts = products.filter((p) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      p.label?.toLowerCase().includes(q) ||
+      p.ref?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q)
+    );
+  });
+
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
+
   const { totalHT, totalTVA, totalTTC } = computeTotals(lines);
 
   return (
@@ -174,32 +190,96 @@ export default function ProposalLines({
       {/* Sélecteur d'ajout de ligne */}
       {!disabled && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          {/* Produit / Service */}
-          <div className="flex-1">
-            <label
-              htmlFor={productSelectId}
-              className="text-foreground mb-1 block text-sm font-medium"
-            >
+          {/* Produit / Service (Custom Searchable Dropdown) */}
+          <div className="relative flex-[3]">
+            <label className="text-foreground mb-1 block text-sm font-medium">
               Produit / Service
             </label>
-            <select
-              id={productSelectId}
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-              disabled={loadingProducts}
-              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset disabled:opacity-50"
-            >
-              <option value="">
-                {loadingProducts
-                  ? 'Chargement...'
-                  : '-- Sélectionnez un produit --'}
-              </option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label} — {formatEur(Number(p.price) || 0)} HT
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                disabled={loadingProducts}
+                className="bg-background text-foreground ring-border focus:ring-primary flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset disabled:opacity-50"
+              >
+                <span className="block truncate">
+                  {loadingProducts ? (
+                    'Chargement...'
+                  ) : selectedProduct ? (
+                    <>
+                      {selectedProduct.type === '1' ? '🛠️ ' : '📦 '}{' '}
+                      {selectedProduct.ref} - {selectedProduct.label}
+                    </>
+                  ) : (
+                    '-- Sélectionnez un produit/service --'
+                  )}
+                </span>
+                <span className="pointer-events-none flex items-center">
+                  <svg
+                    className="text-muted h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
+              </button>
+
+              {isDropdownOpen && (
+                <div className="bg-surface ring-border absolute z-50 mt-1 max-h-80 w-full overflow-hidden rounded-md shadow-2xl ring-1">
+                  <div className="border-border bg-background sticky top-0 border-b p-2">
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Rechercher par nom ou référence..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-surface text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-1.5 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
+                    />
+                  </div>
+                  <ul className="max-h-60 overflow-y-auto py-1 text-sm">
+                    {filteredProducts.length === 0 ? (
+                      <li className="text-muted px-3 py-4 text-center italic">
+                        Aucun résultat trouvé
+                      </li>
+                    ) : (
+                      filteredProducts.map((p) => (
+                        <li
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedProductId(p.id);
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`hover:bg-primary/10 group relative cursor-pointer px-3 py-2 select-none ${
+                            selectedProductId === p.id
+                              ? 'bg-primary/20 font-semibold text-primary'
+                              : 'text-foreground'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">
+                              {p.type === '1' ? '🛠️' : '📦'}
+                            </span>
+                            <div className="flex flex-col">
+                              <span className="block truncate font-medium">
+                                {p.ref} - {p.label}
+                              </span>
+                              <span className="text-muted text-xs">
+                                {formatEur(Number(p.price) || 0)} HT
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Quantité */}

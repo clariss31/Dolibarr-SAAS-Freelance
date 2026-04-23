@@ -364,8 +364,7 @@ function BillingPaymentsContent() {
         }
 
         // Filtres de date d'échéance
-        const dueField =
-          activeTab === 'client' ? 't.date_lim_reglement' : 't.date_echeance';
+        const dueField = 't.date_lim_reglement';
         if (startDue) {
           conditions.push(`(${dueField}:>:'${shiftDate(startDue, -1)}')`);
         }
@@ -455,8 +454,7 @@ function BillingPaymentsContent() {
       if (startDate) conditions.push(`(t.datef:>:'${shiftDate(startDate, -1)}')`);
       if (endDate) conditions.push(`(t.datef:<:'${shiftDate(endDate, 1)}')`);
 
-      const dueField =
-        activeTab === 'client' ? 't.date_lim_reglement' : 't.date_echeance';
+      const dueField = 't.date_lim_reglement';
       if (startDue) conditions.push(`(${dueField}:>:'${shiftDate(startDue, -1)}')`);
       if (endDue) conditions.push(`(${dueField}:<:'${shiftDate(endDue, 1)}')`);
 
@@ -609,20 +607,22 @@ function BillingPaymentsContent() {
               className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
             />
           </div>
+          {activeTab === 'client' && (
+            <div className="min-w-[120px] flex-1">
+              <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+                Échéance Du
+              </label>
+              <input
+                type="date"
+                value={startDue}
+                onChange={(e) => setStartDue(e.target.value)}
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+              />
+            </div>
+          )}
           <div className="min-w-[120px] flex-1">
             <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-              Échéance Du
-            </label>
-            <input
-              type="date"
-              value={startDue}
-              onChange={(e) => setStartDue(e.target.value)}
-              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
-            />
-          </div>
-          <div className="min-w-[120px] flex-1">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-              au
+              {activeTab === 'client' ? 'au' : 'Échéance avant le'}
             </label>
             <div className="flex items-center gap-1">
               <input
