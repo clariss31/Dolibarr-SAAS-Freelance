@@ -2,9 +2,9 @@
 
 /**
  * @file app/(dashboard)/commerce/[id]/page.tsx
- * 
+ *
  * Page de détails d'une proposition commerciale (devis).
- * 
+ *
  * Fonctionnalités :
  * - Affichage exhaustif des informations d'en-tête (Dates, Client).
  * - Résolution robuste du nom du tiers (fallback API si nécessaire).
@@ -41,12 +41,13 @@ function formatCurrency(amount: string | number | undefined): string {
  */
 function formatDate(timestamp: string | number | undefined): string {
   if (!timestamp) return '-';
-  const ts = typeof timestamp === 'string' ? parseInt(timestamp, 10) : Number(timestamp);
+  const ts =
+    typeof timestamp === 'string' ? parseInt(timestamp, 10) : Number(timestamp);
   if (isNaN(ts) || ts === 0) return '-';
   return new Intl.DateTimeFormat('fr-FR').format(new Date(ts * 1000));
 }
 
-/** 
+/**
  * Badge coloré représentant le statut d'une proposition commerciale.
  */
 function ProposalStatusBadge({ status }: { status: string | number }) {
@@ -101,11 +102,11 @@ export default function CommerceDetailsPage() {
   const id = params.id as string;
 
   // --- États ---
-  const [proposal,   setProposal]   = useState<Proposal | null>(null);
+  const [proposal, setProposal] = useState<Proposal | null>(null);
   const [clientName, setClientName] = useState<string>('Chargement...');
-  const [loading,    setLoading]    = useState(true);
-  const [deleting,   setDeleting]   = useState(false);
-  const [error,      setError]      = useState('');
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
 
   /** Charge les détails du devis et résout le tiers */
   const fetchDetails = useCallback(async () => {
@@ -130,8 +131,12 @@ export default function CommerceDetailsPage() {
         setClientName(fetchedProposal.soc_name || fetchedProposal.name || '');
       } else if (fetchedProposal.socid) {
         try {
-          const tierResp = await api.get(`/thirdparties/${fetchedProposal.socid}`);
-          setClientName(tierResp.data?.name || `Tiers ID: ${fetchedProposal.socid}`);
+          const tierResp = await api.get(
+            `/thirdparties/${fetchedProposal.socid}`
+          );
+          setClientName(
+            tierResp.data?.name || `Tiers ID: ${fetchedProposal.socid}`
+          );
         } catch {
           setClientName(`Tiers ID: ${fetchedProposal.socid}`);
         }
@@ -157,8 +162,9 @@ export default function CommerceDetailsPage() {
   // --- Handlers ---
 
   const handleDelete = async () => {
-    if (!window.confirm('Voulez-vous supprimer définitivement ce devis ?')) return;
-    
+    if (!window.confirm('Voulez-vous supprimer définitivement ce devis ?'))
+      return;
+
     setDeleting(true);
     setError('');
     try {
@@ -174,8 +180,10 @@ export default function CommerceDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 animate-pulse">
-        <div className="text-muted text-sm italic">Chargement du document commercial...</div>
+      <div className="flex animate-pulse items-center justify-center py-20">
+        <div className="text-muted text-sm italic">
+          Chargement du document commercial...
+        </div>
       </div>
     );
   }
@@ -183,7 +191,12 @@ export default function CommerceDetailsPage() {
   if (error || !proposal) {
     return (
       <div className="space-y-4">
-        <button onClick={() => router.push('/commerce')} className="text-primary text-sm hover:underline">&larr; Retour</button>
+        <button
+          onClick={() => router.push('/commerce')}
+          className="text-primary text-sm hover:underline"
+        >
+          &larr; Retour
+        </button>
         <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
           {error || 'Document introuvable'}
         </div>
@@ -206,7 +219,7 @@ export default function CommerceDetailsPage() {
       {/* Header : Titre, Statut et Actions */}
       <div className="border-border border-b pb-6 sm:flex sm:items-center sm:justify-between">
         <div className="flex items-center gap-5">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-3xl">
+          <div className="bg-primary/10 flex h-14 w-14 items-center justify-center rounded-xl text-3xl">
             📄
           </div>
           <div>
@@ -216,21 +229,30 @@ export default function CommerceDetailsPage() {
               </h1>
               <ProposalStatusBadge status={proposal.statut ?? '0'} />
             </div>
-            <p className="text-muted mt-1 text-lg font-medium">{clientName}</p>
+            {proposal.socid ? (
+              <button
+                onClick={() => router.push(`/third-parties/${proposal.socid}`)}
+                className="text-muted hover:text-primary mt-1 block text-lg font-medium transition-colors hover:underline"
+              >
+                {clientName}
+              </button>
+            ) : (
+              <p className="text-muted mt-1 text-lg font-medium">{clientName}</p>
+            )}
           </div>
         </div>
-        
+
         <div className="mt-6 flex items-center gap-3 sm:mt-0">
           <button
             onClick={() => router.push(`/commerce/${id}/edit`)}
-            className="inline-flex items-center justify-center rounded-lg bg-background px-4 py-2 text-sm font-semibold text-foreground shadow-sm ring-1 ring-border ring-inset hover:bg-surface transition-all"
+            className="bg-background text-foreground ring-border hover:bg-surface inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold shadow-sm ring-1 transition-all ring-inset"
           >
             Modifier
           </button>
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-red-600 transition-all hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-900/10"
           >
             {deleting ? '...' : 'Supprimer'}
           </button>
@@ -239,20 +261,29 @@ export default function CommerceDetailsPage() {
 
       {/* Grid d'informations */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        
         {/* Informations générales */}
         <section className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
           <div className="border-border bg-background border-b px-5 py-4">
-            <h3 className="text-foreground text-base font-semibold">Informations générales</h3>
+            <h3 className="text-foreground text-base font-semibold">
+              Informations générales
+            </h3>
           </div>
           <div className="grid grid-cols-2 gap-6 p-5">
             <div>
-              <p className="text-muted text-xs font-bold uppercase tracking-widest">Date proposition</p>
-              <p className="text-foreground mt-1 text-sm">{formatDate(proposal.datep)}</p>
+              <p className="text-muted text-xs font-bold tracking-widest uppercase">
+                Date proposition
+              </p>
+              <p className="text-foreground mt-1 text-sm">
+                {formatDate(proposal.datep)}
+              </p>
             </div>
             <div>
-              <p className="text-muted text-xs font-bold uppercase tracking-widest">Fin de validité</p>
-              <p className="text-foreground mt-1 text-sm">{formatDate(proposal.fin_validite)}</p>
+              <p className="text-muted text-xs font-bold tracking-widest uppercase">
+                Fin de validité
+              </p>
+              <p className="text-foreground mt-1 text-sm">
+                {formatDate(proposal.fin_validite)}
+              </p>
             </div>
           </div>
         </section>
@@ -263,15 +294,20 @@ export default function CommerceDetailsPage() {
             <h3 className="text-foreground text-base font-semibold">Tiers</h3>
           </div>
           <div className="p-5">
-            <p className="text-muted text-xs font-bold uppercase tracking-widest">Client / Prospect</p>
-            <p className="text-foreground mt-1 text-sm font-semibold">{clientName}</p>
-            {proposal.socid && (
+            <p className="text-muted text-xs font-bold tracking-widest uppercase">
+              Client / Prospect
+            </p>
+            {proposal.socid ? (
               <button
                 onClick={() => router.push(`/third-parties/${proposal.socid}`)}
-                className="mt-4 text-primary text-sm font-medium hover:underline inline-flex items-center gap-1"
+                className="text-primary mt-1 block text-sm font-semibold hover:underline"
               >
-                Consulter la fiche client <span>&rarr;</span>
+                {clientName}
               </button>
+            ) : (
+              <p className="text-foreground mt-1 text-sm font-semibold">
+                {clientName}
+              </p>
             )}
           </div>
         </section>
@@ -279,35 +315,88 @@ export default function CommerceDetailsPage() {
         {/* Tableau des lignes */}
         <section className="border-border bg-surface overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md lg:col-span-2">
           <div className="border-border bg-background border-b px-5 py-4">
-            <h3 className="text-foreground text-base font-semibold">Lignes du devis</h3>
+            <h3 className="text-foreground text-base font-semibold">
+              Lignes du devis
+            </h3>
           </div>
           <div className="p-0 sm:p-5">
             {proposal.lines && proposal.lines.length > 0 ? (
               <div className="space-y-6">
-                <div className="overflow-x-auto rounded-xl border border-border">
+                <div className="border-border overflow-x-auto rounded-xl border">
                   <table className="w-full text-sm">
                     <thead className="bg-background">
-                      <tr className="border-b border-border">
-                        <th scope="col" className="text-foreground px-4 py-3 text-left font-medium">Désignation</th>
-                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Prix HT</th>
-                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">TVA</th>
-                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Remise</th>
-                        <th scope="col" className="text-foreground px-4 py-3 text-center font-medium">Qté</th>
-                        <th scope="col" className="text-foreground px-4 py-3 text-right font-medium">Total HT</th>
+                      <tr className="border-border border-b">
+                        <th
+                          scope="col"
+                          className="text-foreground px-4 py-3 text-left font-medium"
+                        >
+                          Désignation
+                        </th>
+                        <th
+                          scope="col"
+                          className="text-foreground px-4 py-3 text-right font-medium"
+                        >
+                          Prix HT
+                        </th>
+                        <th
+                          scope="col"
+                          className="text-foreground px-4 py-3 text-right font-medium"
+                        >
+                          TVA
+                        </th>
+                        <th
+                          scope="col"
+                          className="text-foreground px-4 py-3 text-right font-medium"
+                        >
+                          Remise
+                        </th>
+                        <th
+                          scope="col"
+                          className="text-foreground px-4 py-3 text-center font-medium"
+                        >
+                          Qté
+                        </th>
+                        <th
+                          scope="col"
+                          className="text-foreground px-4 py-3 text-right font-medium"
+                        >
+                          Total HT
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-border divide-y">
                       {proposal.lines.map((line, i) => {
-                        const label = line.product_label || line.label || line.description || `Ligne ${i + 1}`;
-                        const totalLineHt = Number(line.total_ht) || (Number(line.subprice || 0) * Number(line.qty || 0));
+                        const label =
+                          line.product_label ||
+                          line.label ||
+                          line.description ||
+                          `Ligne ${i + 1}`;
+                        const totalLineHt =
+                          Number(line.total_ht) ||
+                          Number(line.subprice || 0) * Number(line.qty || 0);
                         return (
-                          <tr key={line.id || i} className="hover:bg-background/50 transition-colors">
-                            <td className="px-4 py-3 text-foreground font-medium">{label}</td>
-                            <td className="px-4 py-3 text-right text-foreground">{formatCurrency(line.subprice)}</td>
-                            <td className="px-4 py-3 text-right text-muted">{line.tva_tx}%</td>
-                            <td className="px-4 py-3 text-right text-muted">{Number(line.remise_percent || 0)}%</td>
-                            <td className="px-4 py-3 text-center text-foreground font-medium">{line.qty}</td>
-                            <td className="px-4 py-3 text-right text-foreground font-semibold">{formatCurrency(totalLineHt)}</td>
+                          <tr
+                            key={line.id || i}
+                            className="hover:bg-background/50 transition-colors"
+                          >
+                            <td className="text-foreground px-4 py-3 font-medium">
+                              {label}
+                            </td>
+                            <td className="text-foreground px-4 py-3 text-right">
+                              {formatCurrency(line.subprice)}
+                            </td>
+                            <td className="text-muted px-4 py-3 text-right">
+                              {line.tva_tx}%
+                            </td>
+                            <td className="text-muted px-4 py-3 text-right">
+                              {Number(line.remise_percent || 0)}%
+                            </td>
+                            <td className="text-foreground px-4 py-3 text-center font-medium">
+                              {line.qty}
+                            </td>
+                            <td className="text-foreground px-4 py-3 text-right font-semibold">
+                              {formatCurrency(totalLineHt)}
+                            </td>
                           </tr>
                         );
                       })}
@@ -317,26 +406,33 @@ export default function CommerceDetailsPage() {
 
                 {/* Totaux */}
                 <div className="flex justify-end">
-                  <dl className="w-full max-w-xs space-y-3 bg-background rounded-xl p-5 border border-border shadow-sm">
+                  <dl className="bg-background border-border w-full max-w-xs space-y-3 rounded-xl border p-5 shadow-sm">
                     <div className="flex justify-between text-sm">
                       <dt className="text-muted">Total HT</dt>
-                      <dd className="text-foreground font-semibold">{formatCurrency(proposal.total_ht)}</dd>
+                      <dd className="text-foreground font-semibold">
+                        {formatCurrency(proposal.total_ht)}
+                      </dd>
                     </div>
                     <div className="flex justify-between text-sm">
                       <dt className="text-muted">TVA</dt>
                       <dd className="text-foreground font-semibold">
-                        {formatCurrency(Number(proposal.total_ttc || 0) - Number(proposal.total_ht || 0))}
+                        {formatCurrency(
+                          Number(proposal.total_ttc || 0) -
+                            Number(proposal.total_ht || 0)
+                        )}
                       </dd>
                     </div>
-                    <div className="flex justify-between border-t border-border pt-3 text-base font-bold">
+                    <div className="border-border flex justify-between border-t pt-3 text-base font-bold">
                       <dt className="text-foreground">Total TTC</dt>
-                      <dd className="text-primary">{formatCurrency(proposal.total_ttc)}</dd>
+                      <dd className="text-primary">
+                        {formatCurrency(proposal.total_ttc)}
+                      </dd>
                     </div>
                   </dl>
                 </div>
               </div>
             ) : (
-              <div className="py-12 text-center text-muted italic text-sm">
+              <div className="text-muted py-12 text-center text-sm italic">
                 Aucune ligne enregistrée sur ce devis.
               </div>
             )}

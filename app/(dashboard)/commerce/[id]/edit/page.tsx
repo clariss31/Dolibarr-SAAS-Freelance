@@ -74,7 +74,11 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
 function timestampToDateString(ts: string | number | undefined): string {
   if (!ts) return '';
   const date = new Date(Number(ts) * 1000);
-  return date.toISOString().split('T')[0];
+  // Utiliser les composants locaux pour éviter les sauts de date liés à l'UTC
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /**
@@ -82,7 +86,8 @@ function timestampToDateString(ts: string | number | undefined): string {
  */
 function dateStringToTimestamp(dateStr: string): number | null {
   if (!dateStr) return null;
-  return Math.floor(new Date(dateStr).getTime() / 1000);
+  // Utiliser midi pour éviter les décalages de fuseau horaire (évite le passage au jour précédent)
+  return Math.floor(new Date(dateStr + 'T12:00:00').getTime() / 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +134,7 @@ export default function EditCommercePage() {
         setProposalRef(d.ref);
         setFormData({
           statut: String(d.statut ?? '0'),
-          datep: timestampToDateString(d.datep),
+          datep: timestampToDateString(d.datep || d.date),
           fin_validite: timestampToDateString(d.fin_validite),
         });
 
@@ -189,10 +194,19 @@ export default function EditCommercePage() {
     setSaving(true);
     setError('');
 
+    // Calcul de la durée de validité en jours (différence entre les deux dates)
+    const dateStart = new Date(formData.datep + 'T12:00:00');
+    const dateEnd = new Date(formData.fin_validite + 'T12:00:00');
+    const diffTime = dateEnd.getTime() - dateStart.getTime();
+    const dureeValidite = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
     const payload = {
       statut: parseInt(formData.statut, 10),
+      date: dateStringToTimestamp(formData.datep),
       datep: dateStringToTimestamp(formData.datep),
       fin_validite: dateStringToTimestamp(formData.fin_validite),
+      date_fin_validite: dateStringToTimestamp(formData.fin_validite),
+      duree_validite: dureeValidite,
     };
 
     try {

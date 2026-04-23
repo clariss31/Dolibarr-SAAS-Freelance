@@ -76,6 +76,7 @@ export interface Proposal {
   thirdparty?: { name?: string };
   soc_name?: string;
   name?: string;
+  date?: number | string;
   datep?: number | string;
   fin_validite?: number | string;
   total_ht: number | string;

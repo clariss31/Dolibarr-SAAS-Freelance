@@ -35,7 +35,8 @@ interface ThirdPartyOption {
  */
 function dateStringToTimestamp(dateStr: string): number | null {
   if (!dateStr) return null;
-  return Math.floor(new Date(dateStr).getTime() / 1000);
+  // Utiliser midi pour éviter les décalages de fuseau horaire (évite le passage au jour précédent)
+  return Math.floor(new Date(dateStr + 'T12:00:00').getTime() / 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,11 +107,20 @@ export default function CreateCommercePage() {
     setSaving(true);
     setError('');
 
+    // Calcul de la durée de validité en jours (différence entre les deux dates)
+    const dateStart = new Date(formData.datep + 'T12:00:00');
+    const dateEnd = new Date(formData.fin_validite + 'T12:00:00');
+    const diffTime = dateEnd.getTime() - dateStart.getTime();
+    const dureeValidite = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
     // Construction du payload complet
     const payload = {
       socid: parseInt(formData.socid, 10),
+      date: dateStringToTimestamp(formData.datep),
       datep: dateStringToTimestamp(formData.datep),
       fin_validite: dateStringToTimestamp(formData.fin_validite),
+      date_fin_validite: dateStringToTimestamp(formData.fin_validite),
+      duree_validite: dureeValidite, // Dolibarr utilise souvent ce champ à la création
       // Dolibarr permet d'envoyer les lignes directement lors du POST initial
       lines: lines.map((line) => ({
         fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
