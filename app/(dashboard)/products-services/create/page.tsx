@@ -180,19 +180,19 @@ function CreateProductForm() {
             <label className="text-foreground mb-3 block text-sm font-medium">
               Libellé & Type *
             </label>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="border-border flex overflow-hidden rounded-md border shadow-sm">
+            <div className="space-y-4">
+              <div className="border-border flex w-full overflow-hidden rounded-md border shadow-sm sm:w-64">
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, type: '0' }))}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${formData.type === '0' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'}`}
+                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${formData.type === '0' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'}`}
                 >
                   Produit
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, type: '1' }))}
-                  className={`border-border border-l px-4 py-2 text-sm font-medium transition-colors ${formData.type === '1' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'}`}
+                  className={`border-border flex-1 border-l px-4 py-2 text-sm font-medium transition-colors ${formData.type === '1' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'}`}
                 >
                   Service
                 </button>
@@ -205,7 +205,7 @@ function CreateProductForm() {
                 value={formData.label}
                 onChange={handleChange}
                 placeholder="Libellé"
-                className="bg-background text-foreground ring-border focus:ring-primary flex-1 rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
+                className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
               />
             </div>
           </div>

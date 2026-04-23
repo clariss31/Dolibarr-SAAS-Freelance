@@ -307,22 +307,21 @@ function CreateInvoiceForm() {
       >
         <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
 
-          {/* Type de facture + sélecteur de tiers sur la même ligne */}
+          {/* Type de facture & Tiers */}
           <div className="sm:col-span-2">
             <span className="text-foreground block text-sm leading-6 font-medium">
               Type de facture &amp; Tiers *
             </span>
-            <div className="mt-2 flex gap-3">
-
-              {/* Bascule Client / Fournisseur */}
+            <div className="mt-2 space-y-4">
+              {/* Bascule Client / Fournisseur (50/50) */}
               <fieldset aria-label="Type de facture">
-                <div className="flex h-full overflow-hidden rounded-md ring-1 ring-[var(--color-border)] ring-inset">
+                <div className="border-border flex w-full overflow-hidden rounded-md border shadow-sm sm:w-64">
                   <button
                     type="button"
                     onClick={() => setInvoiceType('client')}
                     aria-pressed={invoiceType === 'client'}
-                    className={`focus-visible:outline-primary px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                      invoiceType === 'client' ? 'bg-primary text-background' : 'text-muted'
+                    className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                      invoiceType === 'client' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'
                     }`}
                   >
                     Client
@@ -331,8 +330,8 @@ function CreateInvoiceForm() {
                     type="button"
                     onClick={() => setInvoiceType('supplier')}
                     aria-pressed={invoiceType === 'supplier'}
-                    className={`border-border focus-visible:outline-primary border-l px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                      invoiceType === 'supplier' ? 'bg-primary text-background' : 'text-muted'
+                    className={`border-border flex-1 border-l px-4 py-2 text-sm font-medium transition-colors ${
+                      invoiceType === 'supplier' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'
                     }`}
                   >
                     Fournisseur
@@ -340,9 +339,8 @@ function CreateInvoiceForm() {
                 </div>
               </fieldset>
 
-              {/* Select du tiers — prend le reste de la largeur */}
-              <div className="flex-1">
-                {/* Label masqué visuellement mais accessible aux lecteurs d'écran */}
+              {/* Select du tiers en dessous */}
+              <div className="w-full">
                 <label htmlFor="socid" className="sr-only">
                   {invoiceType === 'client' ? 'Sélectionner un client' : 'Sélectionner un fournisseur'}
                 </label>

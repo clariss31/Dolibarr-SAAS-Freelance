@@ -43,50 +43,107 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Vérification côté client de l'authentification (fallback du middleware)
     if (!auth.isAuthenticated()) {
       router.push('/login');
     }
   }, [router]);
 
-  if (!mounted) return null; // Empêche les erreurs d'hydratation
+  // Fermer le menu mobile lors d'un changement de route
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
+
+  if (!mounted) return null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 w-full border-b border-border bg-surface shadow-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           
-          <nav className="flex flex-1 items-center space-x-2 overflow-x-auto py-2 sm:space-x-4 md:space-x-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href || (pathname !== '/' && item.href !== '/' && pathname.startsWith(item.href));
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex shrink-0 flex-col items-center justify-center border-b-2 p-2 px-3 text-xs font-medium transition-colors duration-200 sm:flex-row sm:space-x-2 sm:text-sm
-                    ${isActive 
-                      ? 'border-primary text-primary' 
-                      : 'border-transparent text-muted hover:border-border hover:text-foreground'
-                    }
-                  `}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon className={`h-5 w-5 sm:mb-0 ${isActive ? 'text-primary' : 'text-muted'}`} />
-                  <span className="mt-1 sm:mt-0">{item.name}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <div className="flex items-center gap-4">
+            {/* Bouton Hamburger Mobile */}
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="text-muted hover:text-foreground inline-flex items-center justify-center rounded-md p-2 transition-colors lg:hidden"
+              aria-expanded={isMenuOpen}
+            >
+              <span className="sr-only">Ouvrir le menu</span>
+              {isMenuOpen ? (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
 
-          {/* Icône profil avec menu déroulant */}
-          <div className="ml-4 flex items-center border-l border-border pl-4 shrink-0">
+            {/* Navigation Desktop */}
+            <nav className="hidden h-full lg:flex lg:items-center lg:space-x-8">
+              {navigation.map((item) => {
+                const isActive = pathname === item.href || (pathname !== '/' && item.href !== '/' && pathname.startsWith(item.href));
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`relative flex h-full items-center space-x-2 px-1 text-sm font-medium transition-all duration-200
+                      ${isActive ? 'text-primary' : 'text-muted hover:text-foreground'}
+                    `}
+                  >
+                    <Icon className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted'}`} />
+                    <span>{item.name}</span>
+                    
+                    {/* Indicateur actif (souligné) */}
+                    {isActive && (
+                      <div className="absolute bottom-[-10px] left-0 right-0 h-0.5 bg-primary" />
+                    )}
+                    {!isActive && (
+                      <div className="absolute bottom-[-10px] left-0 right-0 h-0.5 bg-transparent transition-colors duration-200 hover:bg-border" />
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Icône profil */}
+          <div className="flex items-center gap-4 shrink-0">
             <ProfileMenu />
           </div>
         </div>
+
+        {/* Menu Mobile (Hamburger) */}
+        {isMenuOpen && (
+          <div className="border-t border-border bg-surface lg:hidden">
+            <nav className="space-y-1 px-4 py-3">
+              {navigation.map((item) => {
+                const isActive = pathname === item.href || (pathname !== '/' && item.href !== '/' && pathname.startsWith(item.href));
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`flex items-center space-x-3 rounded-xl px-4 py-3 text-base font-medium transition-all
+                      ${isActive 
+                        ? 'bg-primary/10 text-primary' 
+                        : 'text-muted hover:bg-muted/5 hover:text-foreground'
+                      }
+                    `}
+                  >
+                    <Icon className={`h-6 w-6 ${isActive ? 'text-primary' : 'text-muted'}`} />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        )}
       </header>
 
       <main className="flex-1">
