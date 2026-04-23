@@ -110,8 +110,8 @@ export default function EditCommercePage() {
   const [proposalRef, setProposalRef] = useState('');
   const [clientName, setClientName] = useState('Chargement...');
 
+  const [statut, setStatut] = useState('0');
   const [formData, setFormData] = useState({
-    statut: '0',
     datep: '',
     fin_validite: '',
   });
@@ -132,8 +132,8 @@ export default function EditCommercePage() {
       if (response.data) {
         const d = response.data as Proposal;
         setProposalRef(d.ref);
+        setStatut(String(d.statut ?? '0'));
         setFormData({
-          statut: String(d.statut ?? '0'),
           datep: timestampToDateString(d.datep || d.date),
           fin_validite: timestampToDateString(d.fin_validite),
         });
@@ -181,9 +181,9 @@ export default function EditCommercePage() {
 
   // --- Handlers ---
 
-  /** Mise à jour des champs texte/select */
+  /** Mise à jour des champs date */
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -201,7 +201,8 @@ export default function EditCommercePage() {
     const dureeValidite = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
     const payload = {
-      statut: parseInt(formData.statut, 10),
+      // On conserve le statut actuel sans le modifier ici (géré via les boutons d'action)
+      statut: parseInt(statut, 10),
       date: dateStringToTimestamp(formData.datep),
       datep: dateStringToTimestamp(formData.datep),
       fin_validite: dateStringToTimestamp(formData.fin_validite),
@@ -214,7 +215,7 @@ export default function EditCommercePage() {
       await api.put(`/proposals/${id}`, payload);
 
       // 2. Synchronisation des lignes (Uniquement si Brouillon '0')
-      if (formData.statut === '0') {
+      if (statut === '0') {
         // Suppression massive des anciennes lignes
         for (const lineId of originalLineIds) {
           try {
@@ -275,7 +276,7 @@ export default function EditCommercePage() {
     );
   }
 
-  const isDraft = formData.statut === '0';
+  const isDraft = statut === '0';
 
   return (
     <div className="space-y-6">
@@ -286,23 +287,15 @@ export default function EditCommercePage() {
             Modifier le devis {proposalRef}
           </h1>
           <p className="text-muted mt-1 text-sm">
-            Modification de l'état, des dates et du détail commercial.
+            Modification des dates et du détail commercial.
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleDelete}
-            className="text-sm font-medium text-red-500 transition-colors hover:text-red-600"
-          >
-            Supprimer
-          </button>
-          <button
-            onClick={() => router.back()}
-            className="text-muted hover:text-foreground text-sm font-medium transition-colors"
-          >
-            Annuler
-          </button>
-        </div>
+        <button
+          onClick={() => router.back()}
+          className="text-muted hover:text-foreground text-sm font-medium transition-colors"
+        >
+          Annuler
+        </button>
       </div>
 
       {error && (
@@ -330,28 +323,17 @@ export default function EditCommercePage() {
             />
           </div>
 
-          {/* Statut du devis */}
+          {/* Statut affiché en lecture seule (modifiable via les boutons de la fiche détail) */}
           <div className="sm:col-span-2">
-            <label
-              htmlFor="statut"
-              className="text-foreground mb-2 block text-sm font-medium"
-            >
-              État du devis *
-            </label>
-            <select
-              id="statut"
-              name="statut"
-              required
-              value={formData.statut}
-              onChange={handleChange}
-              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
-            >
-              <option value="0">Brouillon</option>
-              <option value="1">Ouvert</option>
-              <option value="2">Signé</option>
-              <option value="3">Non signé</option>
-              <option value="4">Facturé</option>
-            </select>
+            <p className="text-foreground mb-2 block text-sm font-medium">État du devis</p>
+            <div className="flex items-center gap-2">
+              {statut === '0' && <span className="inline-flex items-center rounded-md bg-slate-50 px-2.5 py-1 text-sm font-medium text-slate-600 ring-1 ring-slate-500/10 ring-inset dark:bg-slate-400/10 dark:text-slate-400">Brouillon</span>}
+              {statut === '1' && <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-700 ring-1 ring-blue-700/10 ring-inset dark:bg-blue-400/10 dark:text-blue-400">Ouvert</span>}
+              {statut === '2' && <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset dark:bg-emerald-500/10 dark:text-emerald-400">Signé</span>}
+              {statut === '3' && <span className="inline-flex items-center rounded-md bg-red-50 px-2.5 py-1 text-sm font-medium text-red-700 ring-1 ring-red-600/10 ring-inset dark:bg-red-400/10 dark:text-red-400">Non signé</span>}
+              {statut === '4' && <span className="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-sm font-medium text-purple-700 ring-1 ring-purple-700/10 ring-inset dark:bg-purple-400/10 dark:text-purple-400">Facturé</span>}
+              <span className="text-muted text-xs">(Le statut se modifie depuis la fiche du devis)</span>
+            </div>
           </div>
 
           {/* Dates */}
