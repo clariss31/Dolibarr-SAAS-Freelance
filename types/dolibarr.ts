@@ -39,6 +39,7 @@ export interface Product {
   label: string;
   price?: string | number;
   price_ttc?: string | number;
+  price_base_type?: string;
   tva_tx?: string | number;
   description?: string;
   stock_reel?: string | number;

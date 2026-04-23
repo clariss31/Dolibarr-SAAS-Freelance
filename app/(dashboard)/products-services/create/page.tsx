@@ -115,14 +115,18 @@ function CreateProductForm() {
     setError('');
 
     try {
-      const payload: Partial<Product> = {
+      const priceHt = parseFloat(formData.price || '0');
+      const tvaRate = parseFloat(formData.tva_tx || '0');
+
+      const payload: any = {
         ref: formData.ref,
         label: formData.label,
         type: formData.type,
         status: parseInt(formData.tosell, 10),
         status_buy: parseInt(formData.tobuy, 10),
-        price: formData.price || '0',
-        tva_tx: formData.tva_tx || '0',
+        price: priceHt,
+        price_base_type: 'HT',
+        tva_tx: tvaRate,
         description: formData.description,
       };
 

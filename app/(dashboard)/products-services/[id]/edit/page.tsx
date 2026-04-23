@@ -102,7 +102,7 @@ export default function EditProductPage() {
             product.price && Number(product.price) !== 0
               ? String(Number(product.price).toFixed(2))
               : '',
-          tva_tx: product.tva_tx ? String(product.tva_tx) : '',
+          tva_tx: product.tva_tx ? String(parseFloat(product.tva_tx.toString())) : '',
           description: product.description
             ? decodeHtmlEntities(product.description)
             : '',
@@ -195,16 +195,27 @@ export default function EditProductPage() {
     setError('');
 
     try {
-      const payload: Partial<Product> = {
+      const priceHt = parseFloat(formData.price || '0');
+      const tvaRate = parseFloat(formData.tva_tx || '0');
+
+      const payload: any = {
         ref: formData.ref,
         label: formData.label,
         type: formData.type,
         status: parseInt(formData.tosell, 10),
         status_buy: parseInt(formData.tobuy, 10),
-        price: formData.price || '0',
-        tva_tx: formData.tva_tx || '0',
+        price: priceHt,
+        price_base_type: 'HT',
+        tva_tx: tvaRate,
         description: formData.description,
+        // Pour Dolibarr avec module multiprix activé
+        multiprices: { "1": priceHt },
+        multiprices_base_type: { "1": "HT" },
+        multiprices_tva_tx: { "1": tvaRate },
+        multiprices_tx: { "1": tvaRate }
       };
+      
+      console.log("Submitting payload with multiprice support:", payload);
 
       await api.put(`/products/${id}`, payload);
       router.push(`/products-services/${id}`); // Retour au détail

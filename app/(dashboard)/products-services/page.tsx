@@ -202,7 +202,7 @@ export default function ProductsServicesPage() {
           <input
             id="search"
             type="search"
-            placeholder={`Rechercher un ${typeFilter === 'product' ? 'produit' : 'service'}...`}
+            placeholder={`Rechercher...`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary block w-full rounded-md px-3 py-2 text-sm shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
@@ -254,13 +254,13 @@ export default function ProductsServicesPage() {
                   scope="col"
                   className="text-foreground w-32 px-3 py-3.5 text-center text-sm font-semibold"
                 >
-                  Vente
+                  État (Vente)
                 </th>
                 <th
                   scope="col"
                   className="text-foreground w-32 px-3 py-3.5 text-center text-sm font-semibold"
                 >
-                  Achat
+                  État (Achat)
                 </th>
               </tr>
             </thead>
