@@ -165,8 +165,8 @@ export default function ThirdPartiesPage() {
       </div>
 
       {error && (
-        <div
-          className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200"
+        <div 
+          className="rounded-lg bg-[#2d1414] border border-red-900/50 p-4 text-sm text-[#ff6b6b] shadow-lg font-medium animate-in fade-in slide-in-from-top-2 duration-300"
           role="alert"
         >
           {error}

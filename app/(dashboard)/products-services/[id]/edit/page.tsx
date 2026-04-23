@@ -102,7 +102,9 @@ export default function EditProductPage() {
             product.price && Number(product.price) !== 0
               ? String(Number(product.price).toFixed(2))
               : '',
-          tva_tx: product.tva_tx ? String(parseFloat(product.tva_tx.toString())) : '',
+          tva_tx: product.tva_tx
+            ? String(parseFloat(product.tva_tx.toString()))
+            : '',
           description: product.description
             ? decodeHtmlEntities(product.description)
             : '',
@@ -166,7 +168,7 @@ export default function EditProductPage() {
     } catch (err: unknown) {
       setStockMessage({
         type: 'error',
-        text: getErrorMessage(err) || 'Erreur lors de la mise à jour.',
+        text: getErrorMessage(err, 'stock') || 'Erreur lors de la mise à jour.',
       });
     } finally {
       setAdjustingStock(false);
@@ -209,13 +211,13 @@ export default function EditProductPage() {
         tva_tx: tvaRate,
         description: formData.description,
         // Pour Dolibarr avec module multiprix activé
-        multiprices: { "1": priceHt },
-        multiprices_base_type: { "1": "HT" },
-        multiprices_tva_tx: { "1": tvaRate },
-        multiprices_tx: { "1": tvaRate }
+        multiprices: { '1': priceHt },
+        multiprices_base_type: { '1': 'HT' },
+        multiprices_tva_tx: { '1': tvaRate },
+        multiprices_tx: { '1': tvaRate },
       };
-      
-      console.log("Submitting payload with multiprice support:", payload);
+
+      console.log('Submitting payload with multiprice support:', payload);
 
       await api.put(`/products/${id}`, payload);
       router.push(`/products-services/${id}`); // Retour au détail
@@ -282,7 +284,7 @@ export default function EditProductPage() {
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
+        <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300">
           {error}
         </div>
       )}
@@ -483,7 +485,11 @@ export default function EditProductPage() {
 
           {stockMessage && (
             <div
-              className={`rounded-md p-3 text-xs font-medium ${stockMessage.type === 'success' ? 'border border-green-200 bg-green-50 text-green-700' : 'border border-red-200 bg-red-50 text-red-700'}`}
+              className={`animate-in fade-in rounded-lg p-4 text-sm font-medium shadow-sm duration-300 ${
+                stockMessage.type === 'success'
+                  ? 'border border-green-900/30 bg-[#142d1a] text-[#71f88e]'
+                  : 'border border-red-900/50 bg-[#2d1414] text-[#ff6b6b]'
+              }`}
             >
               {stockMessage.text}
             </div>
@@ -530,7 +536,7 @@ export default function EditProductPage() {
                   disabled={
                     adjustingStock || warehouses.length === 0 || !stockQty
                   }
-                  className="bg-primary rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+                  className="bg-primary text-background rounded-md px-4 py-2 text-sm font-semibold shadow-sm hover:opacity-90 disabled:opacity-50"
                 >
                   {adjustingStock ? '...' : 'Ajuster'}
                 </button>
