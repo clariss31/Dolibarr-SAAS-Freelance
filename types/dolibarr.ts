@@ -11,6 +11,8 @@ export interface ThirdParty {
   zip?: string;
   town?: string;
   country?: string;
+  country_id?: string | number;
+  country_code?: string;
   tva_intra?: string;
   idprof2?: string;
   code_client?: string;

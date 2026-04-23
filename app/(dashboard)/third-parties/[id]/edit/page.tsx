@@ -37,7 +37,7 @@ export default function EditThirdPartyPage() {
     address: '',
     zip: '',
     town: '',
-    country: '',
+    country_id: '',
     tva_intra: '',
     idprof2: '',
     code_client: '',
@@ -78,7 +78,7 @@ export default function EditThirdPartyPage() {
           address: d.address || '',
           zip: d.zip || '',
           town: d.town || '',
-          country: d.country || '',
+          country_id: d.country_id || '1',
           tva_intra: d.tva_intra || '',
           idprof2: d.idprof2 || '',
           code_client: d.code_client || '',
@@ -96,6 +96,28 @@ export default function EditThirdPartyPage() {
   useEffect(() => {
     fetchTier();
   }, [fetchTier]);
+
+  // --- Pays ---
+  const [countries, setCountries] = useState<{id: string | number, label: string}[]>([
+    { id: '1', label: 'France' }
+  ]);
+  const [loadingCountries, setLoadingCountries] = useState(true);
+
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const res = await api.get('/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR');
+        if (Array.isArray(res.data)) {
+          setCountries(res.data.filter((c: any) => String(c.active) === '1'));
+        }
+      } catch (err) {
+        console.warn('Erreur lors du chargement des pays', err);
+      } finally {
+        setLoadingCountries(false);
+      }
+    };
+    fetchCountries();
+  }, []);
 
   // --- Handlers ---
 
@@ -389,19 +411,25 @@ export default function EditThirdPartyPage() {
               </div>
               <div>
                 <label
-                  htmlFor="country"
+                  htmlFor="country_id"
                   className="text-foreground mb-2 block text-sm font-medium"
                 >
                   Pays
                 </label>
-                <input
-                  type="text"
-                  id="country"
-                  name="country"
-                  value={formData.country}
+                <select
+                  id="country_id"
+                  name="country_id"
+                  value={formData.country_id}
                   onChange={handleChange}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
-                />
+                  disabled={loadingCountries}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 disabled:opacity-50"
+                >
+                  {countries.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

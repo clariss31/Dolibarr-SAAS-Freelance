@@ -17,6 +17,23 @@ export default function CompanySettingsPage() {
   const [error, setError] = useState('');
   const [org, setOrg] = useState<Organization | null>(null);
 
+  // --- Pays ---
+  const [countries, setCountries] = useState<{id: string | number, label: string}[]>([]);
+  
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const res = await api.get('/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR');
+        if (Array.isArray(res.data)) {
+          setCountries(res.data.filter((c: any) => String(c.active) === '1'));
+        }
+      } catch (err) {
+        console.warn('Erreur chargement pays:', err);
+      }
+    };
+    fetchCountries();
+  }, []);
+
   // Chargement des infos organisation
   useEffect(() => {
     const fetchOrg = async () => {
@@ -163,6 +180,14 @@ export default function CompanySettingsPage() {
               Ville
             </span>
             <p className="text-foreground mt-1 text-sm">{org?.town || '-'}</p>
+          </div>
+          <div>
+            <span className="text-muted text-xs font-medium tracking-wider uppercase">
+              Pays
+            </span>
+            <p className="text-foreground mt-1 text-sm">
+              {countries.find(c => String(c.id) === String(org?.country_id))?.label || '-'}
+            </p>
           </div>
         </div>
       </div>

@@ -50,6 +50,23 @@ export default function ThirdPartyDetailsPage() {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // --- Pays ---
+  const [countries, setCountries] = useState<{id: string | number, label: string}[]>([]);
+  
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const res = await api.get('/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR');
+        if (Array.isArray(res.data)) {
+          setCountries(res.data.filter((c: any) => String(c.active) === '1'));
+        }
+      } catch (err) {
+        console.warn('Erreur chargement pays:', err);
+      }
+    };
+    fetchCountries();
+  }, []);
+
   // --- Logique de récupération ---
 
   /** Charge les informations du tiers depuis l'API */
@@ -302,7 +319,10 @@ export default function ThirdPartyDetailsPage() {
                 Pays
               </p>
               <p className="text-foreground mt-1 text-sm">
-                {tier.country || '-'}
+                {tier.country || 
+                 countries.find(c => String(c.id) === String(tier.country_id))?.label || 
+                 tier.country_code || 
+                 '-'}
               </p>
             </div>
           </div>

@@ -14,6 +14,7 @@ Tu es l'assistant expert pour le projet de Clarisse chez Pichinov. Ton but est d
 - **Langage** : TypeScript (Typage strict pour les interfaces API).
 - **Styles** : Tailwind CSS (Design moderne et responsive).
 - **Backend** : API REST Dolibarr (Connexion sécurisée par token).
+- **Endpoints** : voir le fichier swagger.json.
 
 ## ♿ Règles d'Accessibilité (Critères de réussite)
 
