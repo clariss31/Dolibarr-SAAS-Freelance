@@ -176,6 +176,7 @@ export default function ThirdPartiesPage() {
       {/* Barre d'outils (Recherche & Filtres) */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
         <div className="flex-1">
+          <label htmlFor="search" className="sr-only">Rechercher un tiers</label>
           <input
             id="search"
             type="search"
@@ -186,6 +187,7 @@ export default function ThirdPartiesPage() {
           />
         </div>
         <div>
+          <label htmlFor="type-filter" className="sr-only">Filtrer par type</label>
           <select
             id="type-filter"
             value={typeFilter}

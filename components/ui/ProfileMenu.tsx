@@ -140,7 +140,7 @@ export default function ProfileMenu() {
             {getInitials()}
           </span>
         ) : (
-          <UserCircleIcon className="text-muted h-5 w-5" />
+          <UserCircleIcon className="text-muted h-5 w-5" aria-hidden="true" />
         )}
       </button>
 
@@ -170,7 +170,7 @@ export default function ProfileMenu() {
               onClick={() => setIsOpen(false)}
               className="text-foreground hover:bg-background flex items-center gap-3 px-4 py-2 text-sm transition-colors"
             >
-              <UserCircleIcon className="text-muted h-4 w-4 shrink-0" />
+              <UserCircleIcon className="text-muted h-4 w-4 shrink-0" aria-hidden="true" />
               Profil
             </Link>
 
@@ -181,7 +181,7 @@ export default function ProfileMenu() {
               onClick={() => setIsOpen(false)}
               className="text-foreground hover:bg-background flex items-center gap-3 px-4 py-2 text-sm transition-colors"
             >
-              <BuildingIcon className="text-muted h-4 w-4 shrink-0" />
+              <BuildingIcon className="text-muted h-4 w-4 shrink-0" aria-hidden="true" />
               Entreprise
             </Link>
           </div>
@@ -193,7 +193,7 @@ export default function ProfileMenu() {
               onClick={handleLogout}
               className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
             >
-              <LogOutIcon className="h-4 w-4 shrink-0" />
+              <LogOutIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
               Se déconnecter
             </button>
           </div>

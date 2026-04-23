@@ -301,10 +301,11 @@ export default function CommercePage() {
         {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
         <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
           <div className="flex-1 min-w-[120px]">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
+            <label htmlFor="date-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
               Proposition Du
             </label>
             <input
+              id="date-start"
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
@@ -312,10 +313,11 @@ export default function CommercePage() {
             />
           </div>
           <div className="flex-1 min-w-[120px]">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+            <label htmlFor="date-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
               au
             </label>
             <input
+              id="date-end"
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
@@ -323,10 +325,11 @@ export default function CommercePage() {
             />
           </div>
           <div className="flex-1 min-w-[120px]">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
+            <label htmlFor="due-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
               Fin validité Du
             </label>
             <input
+              id="due-start"
               type="date"
               value={startDue}
               onChange={(e) => setStartDue(e.target.value)}
@@ -334,11 +337,12 @@ export default function CommercePage() {
             />
           </div>
           <div className="flex-1 min-w-[120px]">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+            <label htmlFor="due-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
               au
             </label>
             <div className="flex items-center gap-1">
               <input
+                id="due-end"
                 type="date"
                 value={endDue}
                 onChange={(e) => setEndDue(e.target.value)}
@@ -355,7 +359,7 @@ export default function CommercePage() {
                   className="text-muted hover:text-red-500 transition-colors"
                   title="Réinitialiser"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -378,7 +382,9 @@ export default function CommercePage() {
       {/* Barre de Filtres */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="flex-1">
+          <label htmlFor="search" className="sr-only">Rechercher un devis</label>
           <input
+            id="search"
             type="search"
             placeholder="Rechercher..."
             value={searchTerm}
@@ -387,7 +393,9 @@ export default function CommercePage() {
           />
         </div>
         <div>
+          <label htmlFor="status" className="sr-only">Filtrer par état</label>
           <select
+            id="status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset"

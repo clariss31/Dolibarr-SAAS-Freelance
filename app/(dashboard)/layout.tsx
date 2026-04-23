@@ -84,7 +84,7 @@ export default function DashboardLayout({
             </button>
 
             {/* Navigation Desktop */}
-            <nav className="hidden h-full lg:flex lg:items-center lg:space-x-8">
+            <nav className="hidden h-full lg:flex lg:items-center lg:space-x-8" aria-label="Navigation principale">
               {navigation.map((item) => {
                 const isActive = pathname === item.href || (pathname !== '/' && item.href !== '/' && pathname.startsWith(item.href));
                 const Icon = item.icon;
@@ -92,11 +92,12 @@ export default function DashboardLayout({
                   <Link
                     key={item.name}
                     href={item.href}
+                    aria-current={isActive ? 'page' : undefined}
                     className={`relative flex h-full items-center space-x-2 px-1 text-sm font-medium transition-all duration-200
                       ${isActive ? 'text-primary' : 'text-muted hover:text-foreground'}
                     `}
                   >
-                    <Icon className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted'}`} />
+                    <Icon className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted'}`} aria-hidden="true" />
                     <span>{item.name}</span>
                     
                     {/* Indicateur actif (souligné) */}
@@ -121,7 +122,7 @@ export default function DashboardLayout({
         {/* Menu Mobile (Hamburger) */}
         {isMenuOpen && (
           <div className="border-t border-border bg-surface lg:hidden">
-            <nav className="space-y-1 px-4 py-3">
+            <nav className="space-y-1 px-4 py-3" aria-label="Navigation mobile">
               {navigation.map((item) => {
                 const isActive = pathname === item.href || (pathname !== '/' && item.href !== '/' && pathname.startsWith(item.href));
                 const Icon = item.icon;
@@ -129,6 +130,7 @@ export default function DashboardLayout({
                   <Link
                     key={item.name}
                     href={item.href}
+                    aria-current={isActive ? 'page' : undefined}
                     className={`flex items-center space-x-3 rounded-xl px-4 py-3 text-base font-medium transition-all
                       ${isActive 
                         ? 'bg-primary/10 text-primary' 
@@ -136,7 +138,7 @@ export default function DashboardLayout({
                       }
                     `}
                   >
-                    <Icon className={`h-6 w-6 ${isActive ? 'text-primary' : 'text-muted'}`} />
+                    <Icon className={`h-6 w-6 ${isActive ? 'text-primary' : 'text-muted'}`} aria-hidden="true" />
                     <span>{item.name}</span>
                   </Link>
                 );

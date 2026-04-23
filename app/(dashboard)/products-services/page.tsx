@@ -199,6 +199,7 @@ export default function ProductsServicesPage() {
       {/* Barre de recherche */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
         <div className="max-w-md flex-1">
+          <label htmlFor="search" className="sr-only">Rechercher un produit ou service</label>
           <input
             id="search"
             type="search"

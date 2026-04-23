@@ -628,85 +628,90 @@ function BillingPaymentsContent() {
         </nav>
       </div>
 
-      {/* Zone Haute : Dates et Totaux */}
-      <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between">
         {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
-        <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
-          <div className="min-w-[120px] flex-1">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-              Facturation Du
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
-            />
-          </div>
-          <div className="min-w-[120px] flex-1">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-              au
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
-            />
-          </div>
-          {activeTab === 'client' && (
+        <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between">
+          {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
+          <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
             <div className="min-w-[120px] flex-1">
-              <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-                Échéance Du
+              <label htmlFor="date-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+                Facturation Du
               </label>
               <input
+                id="date-start"
                 type="date"
-                value={startDue}
-                onChange={(e) => setStartDue(e.target.value)}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
               />
             </div>
-          )}
-          <div className="min-w-[120px] flex-1">
-            <label className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-              {activeTab === 'client' ? 'au' : 'Échéance avant le'}
-            </label>
-            <div className="flex items-center gap-1">
+            <div className="min-w-[120px] flex-1">
+              <label htmlFor="date-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+                au
+              </label>
               <input
+                id="date-end"
                 type="date"
-                value={endDue}
-                onChange={(e) => setEndDue(e.target.value)}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
               />
-              {(startDate || endDate || startDue || endDue) && (
-                <button
-                  onClick={() => {
-                    setStartDate('');
-                    setEndDate('');
-                    setStartDue('');
-                    setEndDue('');
-                  }}
-                  className="text-muted transition-colors hover:text-red-500"
-                  title="Réinitialiser"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+            </div>
+            {activeTab === 'client' && (
+              <div className="min-w-[120px] flex-1">
+                <label htmlFor="due-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+                  Échéance Du
+                </label>
+                <input
+                  id="due-start"
+                  type="date"
+                  value={startDue}
+                  onChange={(e) => setStartDue(e.target.value)}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+                />
+              </div>
+            )}
+            <div className="min-w-[120px] flex-1">
+              <label htmlFor="due-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+                {activeTab === 'client' ? 'au' : 'Échéance avant le'}
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  id="due-end"
+                  type="date"
+                  value={endDue}
+                  onChange={(e) => setEndDue(e.target.value)}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+                />
+                {(startDate || endDate || startDue || endDue) && (
+                  <button
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                      setStartDue('');
+                      setEndDue('');
+                    }}
+                    className="text-muted transition-colors hover:text-red-500"
+                    title="Réinitialiser"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              )}
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Résumé des totaux de la période */}
         <div className="bg-primary/5 border-primary/10 flex flex-1 items-center justify-around gap-4 rounded-xl border px-6 lg:min-w-[320px] lg:flex-none">
