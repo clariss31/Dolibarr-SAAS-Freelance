@@ -15,8 +15,8 @@
  * - Le total est lu dans l'en-tête HTTP `X-Total-Count` (avec fallback).
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../services/api';
 import { getErrorMessage } from '../../../utils/error-handler';
 import { Invoice, ApiError } from '../../../types/dolibarr';
@@ -175,11 +175,23 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
  * Gère : la navigation par onglets, la recherche debouncée, le filtre par statut,
  * la pagination serveur et l'affichage du nom des tiers via un dictionnaire préchargé.
  */
-export default function BillingPaymentsPage() {
+function BillingPaymentsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // --- Onglet actif ---
-  const [activeTab, setActiveTab] = useState<InvoiceTab>('client');
+  const initialTab = (searchParams.get('tab') as InvoiceTab) || 'client';
+  const [activeTab, setActiveTab] = useState<InvoiceTab>(
+    initialTab === 'supplier' ? 'supplier' : 'client'
+  );
+
+  // Synchronisation de l'onglet avec l'URL (si le paramètre change via navigation)
+  useEffect(() => {
+    const tab = searchParams.get('tab') as InvoiceTab;
+    if (tab === 'supplier' || tab === 'client') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // --- Données ---
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -907,5 +919,23 @@ export default function BillingPaymentsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Point d'entrée de la route `/billing-payments`.
+ * Enveloppé dans Suspense car utilise useSearchParams().
+ */
+export default function BillingPaymentsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-muted flex items-center justify-center py-20 text-sm">
+          Chargement de la facturation...
+        </div>
+      }
+    >
+      <BillingPaymentsContent />
+    </Suspense>
   );
 }

@@ -583,7 +583,7 @@ export default function DashboardRootPage() {
                   ? `${formatCurrency(stats.unpaidInvoicesTTC)} TTC - ${formatCurrency(stats.unpaidInvoicesTVA)} TVA`
                   : undefined
               }
-              href="/billing-payments"
+              href="/billing-payments?tab=client"
             />
             <StatCard
               label="Factures fourn. impayées HT"
@@ -600,7 +600,7 @@ export default function DashboardRootPage() {
                   ? `${formatCurrency(stats.upcomingSupplierTTC)} TTC - ${formatCurrency(stats.upcomingSupplierTVA)} TVA`
                   : undefined
               }
-              href="/billing-payments"
+              href="/billing-payments?tab=supplier"
             />
           </div>
         );
