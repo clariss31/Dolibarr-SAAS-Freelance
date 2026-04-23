@@ -31,6 +31,25 @@ const PAGE_LIMIT = 10;
 /** Délai de debounce pour la recherche (en millisecondes). */
 const SEARCH_DEBOUNCE_MS = 400;
 
+/**
+ * Décale une date YYYY-MM-DD d'un nombre de jours et retourne le résultat au format YYYYMMDD.
+ * Utilisé pour convertir >= en > (décalage -1) et <= en < (décalage +1),
+ * car le parser sqlfilters de Dolibarr n'accepte que < et > comme opérateurs de comparaison.
+ */
+function shiftDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${dd}`;
+}
+
+/** Convertit une date YYYY-MM-DD en format YYYYMMDD sans décalage. */
+function toDoliDate(dateStr: string): string {
+  return dateStr.replace(/-/g, '');
+}
+
 // ---------------------------------------------------------------------------
 // Types locaux
 // ---------------------------------------------------------------------------
@@ -329,31 +348,34 @@ function BillingPaymentsContent() {
         if (debouncedSearch) {
           const safe = debouncedSearch.replace(/'/g, "''"); // échappement SQL
           conditions.push(
-            `((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`
+            `((t.ref:like:'%${safe}%') or (s.nom:like:'%${safe}%'))`
           );
         }
 
-        // Filtres de date de facturation (t.date)
+        // Filtres de date de facturation (t.datef)
+        // Dolibarr sqlfilters n'accepte que < et > (pas >= ni <=)
+        // >= date  →  > (date - 1 jour)
+        // <= date  →  < (date + 1 jour)
         if (startDate) {
-          conditions.push(`(t.date:>=:'${startDate} 00:00:00')`);
+          conditions.push(`(t.datef:>:'${shiftDate(startDate, -1)}')`);
         }
         if (endDate) {
-          conditions.push(`(t.date:<=:'${endDate} 23:59:59')`);
+          conditions.push(`(t.datef:<:'${shiftDate(endDate, 1)}')`);
         }
 
-        // Filtres de date d'échéance (t.date_lim_reglement)
+        // Filtres de date d'échéance
         const dueField =
           activeTab === 'client' ? 't.date_lim_reglement' : 't.date_echeance';
         if (startDue) {
-          conditions.push(`(${dueField}:>=:'${startDue} 00:00:00')`);
+          conditions.push(`(${dueField}:>:'${shiftDate(startDue, -1)}')`);
         }
         if (endDue) {
-          conditions.push(`(${dueField}:<=:'${endDue} 23:59:59')`);
+          conditions.push(`(${dueField}:<:'${shiftDate(endDue, 1)}')`);
         }
 
         let query = `${endpoint}?sortfield=t.rowid&sortorder=DESC&limit=${PAGE_LIMIT}&page=${currentPage}`;
         if (conditions.length > 0) {
-          query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
+          query += `&sqlfilters=${encodeURIComponent(conditions.join(' and '))}`;
         }
 
         const response = await api.get(query);
@@ -427,20 +449,20 @@ function BillingPaymentsContent() {
       if (debouncedSearch) {
         const safe = debouncedSearch.replace(/'/g, "''");
         conditions.push(
-          `((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`
+          `((t.ref:like:'%${safe}%') or (s.nom:like:'%${safe}%'))`
         );
       }
-      if (startDate) conditions.push(`(t.date:>=:'${startDate} 00:00:00')`);
-      if (endDate) conditions.push(`(t.date:<=:'${endDate} 23:59:59')`);
+      if (startDate) conditions.push(`(t.datef:>:'${shiftDate(startDate, -1)}')`);
+      if (endDate) conditions.push(`(t.datef:<:'${shiftDate(endDate, 1)}')`);
 
       const dueField =
         activeTab === 'client' ? 't.date_lim_reglement' : 't.date_echeance';
-      if (startDue) conditions.push(`(${dueField}:>=:'${startDue} 00:00:00')`);
-      if (endDue) conditions.push(`(${dueField}:<=:'${endDue} 23:59:59')`);
+      if (startDue) conditions.push(`(${dueField}:>:'${shiftDate(startDue, -1)}')`);
+      if (endDue) conditions.push(`(${dueField}:<:'${shiftDate(endDue, 1)}')`);
 
       let query = `${endpoint}?limit=1000`;
       if (conditions.length > 0) {
-        query += `&sqlfilters=${encodeURIComponent(conditions.join(' AND '))}`;
+        query += `&sqlfilters=${encodeURIComponent(conditions.join(' and '))}`;
       }
 
       const res = await api.get(query);
