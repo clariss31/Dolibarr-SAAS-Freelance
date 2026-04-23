@@ -89,6 +89,7 @@ export default function ProductDetailsPage() {
   }, [fetchProduct]);
 
   // --- Handlers ---
+  const [deleteError, setDeleteError] = useState('');
 
   /** Supprime définitivement le produit après confirmation */
   const handleDelete = async () => {
@@ -100,17 +101,27 @@ export default function ProductDetailsPage() {
       return;
 
     setDeleting(true);
-    setError('');
+    setDeleteError('');
     try {
       await api.delete(`/products/${id}`);
       router.push('/products-services');
     } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      const msg = getErrorMessage(err);
+      if (
+        msg.includes('Conflict') ||
+        msg.toLowerCase().includes('probably used')
+      ) {
+        setDeleteError(
+          'Impossible de supprimer un produit/service utilisé sur une facture ou un devis.'
+        );
+      } else {
+        setDeleteError(msg);
+      }
       setDeleting(false);
     }
   };
 
-  // --- Rendu conditionnel (Chargement / Erreur) ---
+  // --- Rendu conditionnel (Chargement / Erreur Initiale) ---
 
   if (loading) {
     return (
@@ -120,7 +131,8 @@ export default function ProductDetailsPage() {
     );
   }
 
-  if (error || !product) {
+  // Si on n'a pas de produit, c'est une erreur (soit 404, soit erreur API)
+  if (!product) {
     return (
       <div className="space-y-4">
         <button
@@ -130,7 +142,7 @@ export default function ProductDetailsPage() {
           &larr; Retour au catalogue
         </button>
         <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
-          {error || 'Introuvable'}
+          {error || 'Produit introuvable'}
         </div>
       </div>
     );
@@ -142,6 +154,12 @@ export default function ProductDetailsPage() {
 
   return (
     <div className="space-y-6">
+      {deleteError && (
+        <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300">
+          {deleteError}
+        </div>
+      )}
+
       <div className="flex items-center">
         <button
           onClick={() => router.push('/products-services')}
