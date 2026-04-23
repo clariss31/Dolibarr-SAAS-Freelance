@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DoliFree SaaS - Interface Moderne Dolibarr pour Freelance
 
-## Getting Started
+DoliFree est une application web moderne conçue pour simplifier la gestion quotidienne des freelances. Elle se connecte à votre instance **Dolibarr ERP/CRM** existante via son API REST pour offrir une expérience utilisateur fluide, rapide et mobile-first.
 
-First, run the development server:
+## 🚀 Fonctionnalités principales
+
+- **Tableau de bord** : KPIs financiers en temps réel (CA, impayés, etc.).
+- **Gestion des Tiers** : CRUD complet des clients et fournisseurs.
+- **Commerce** : Gestion des propositions commerciales (devis).
+- **Facturation & Règlements** : Suivi des factures clients/fournisseurs et saisie des paiements.
+- **Catalogue** : Gestion des produits et services.
+
+## 🛠 Configuration et Installation
+
+### 1. Prérequis
+
+- Une instance **Dolibarr** (v14+ recommandée) avec le module **API REST** activé.
+- **Node.js** (v18+) et **npm** (ou yarn) installés sur votre machine.
+
+### 2. Configuration de l'environnement
+
+Créez un fichier `.env.local` à la racine du projet et configurez l'URL de l'API de votre Dolibarr :
+
+```bash
+# Exemple de configuration dans .env.local
+NEXT_PUBLIC_DOLIBARR_API_URL=https://votre-dolibarr.com/api/index.php
+```
+
+> [!IMPORTANT]
+> L'URL doit pointer vers le fichier `index.php` du dossier `/api/` de votre installation Dolibarr.
+
+### 3. Installation des dépendances
+
+Installez les bibliothèques nécessaires au projet :
+
+```bash
+npm install
+```
+
+### 4. Lancement de l'application
+
+Démarrez le serveur de développement :
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+L'application sera accessible sur [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🧰 Stack Technique
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Framework** : Next.js (App Router)
+- **Langage** : TypeScript (Typage strict)
+- **Styles** : Tailwind CSS 4.0
+- **Authentification** : Gestion par Token API Dolibarr (DOLAPIKEY)
+- **Accessibilité** : Respect des standards WCAG 2.1
 
-## Learn More
+## 📄 Licence
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Projet développé pour Clarisse (Pichinov) dans le cadre de la modernisation de l'interface Dolibarr pour les indépendants.

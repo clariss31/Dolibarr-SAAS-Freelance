@@ -1005,7 +1005,8 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     const puHt = Number(line.subprice) || 0;
                     const remise = Number(line.remise_percent) || 0;
                     const qty = Number(line.qty) || 1;
-                    const lineTotalHt = Number(line.total_ht) || puHt * qty * (1 - remise / 100);
+                    const lineTotalHt =
+                      Number(line.total_ht) || puHt * qty * (1 - remise / 100);
 
                     return (
                       <tr
@@ -1024,7 +1025,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                           {tva}%
                         </td>
                         <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
-                          {remise > 0 ? `${remise}%` : '-'}
+                          {remise > 0 ? `${remise}%` : '0%'}
                         </td>
                         <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
                           {qty}
