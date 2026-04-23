@@ -45,6 +45,8 @@ export interface Product {
   stock_theorique?: string | number;
   tosell: string | number; // 1 = en vente, 0 = hors vente
   tobuy: string | number; // 1 = en achat, 0 = hors achat
+  status?: string | number;
+  status_buy?: string | number;
   type: string | number; // 0 = produit, 1 = service
 }
 

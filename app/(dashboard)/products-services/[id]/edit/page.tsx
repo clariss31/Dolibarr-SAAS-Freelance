@@ -106,8 +106,8 @@ export default function EditProductPage() {
           description: product.description
             ? decodeHtmlEntities(product.description)
             : '',
-          tosell: String(product.tosell || '0'),
-          tobuy: String(product.tobuy || '0'),
+          tosell: String(product.status ?? product.tosell ?? '0'),
+          tobuy: String(product.status_buy ?? product.tobuy ?? '0'),
         });
       } else {
         setError('Produit introuvable.');
@@ -199,8 +199,8 @@ export default function EditProductPage() {
         ref: formData.ref,
         label: formData.label,
         type: formData.type,
-        tosell: formData.tosell,
-        tobuy: formData.tobuy,
+        status: parseInt(formData.tosell, 10),
+        status_buy: parseInt(formData.tobuy, 10),
         price: formData.price || '0',
         tva_tx: formData.tva_tx || '0',
         description: formData.description,

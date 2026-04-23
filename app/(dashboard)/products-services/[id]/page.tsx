@@ -201,7 +201,7 @@ export default function ProductDetailsPage() {
               <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
                 État (Vente)
               </p>
-              {String(product.tosell) === '1' ? (
+              {String(product.status ?? product.tosell) === '1' ? (
                 <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-green-600/20 ring-inset dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
                   En vente
                 </span>
@@ -215,7 +215,7 @@ export default function ProductDetailsPage() {
               <p className="text-muted mb-2 text-xs font-medium tracking-wider uppercase">
                 État (Achat)
               </p>
-              {String(product.tobuy) === '1' ? (
+              {String(product.status_buy ?? product.tobuy) === '1' ? (
                 <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-700/10 ring-inset dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/30">
                   En achat
                 </span>
