@@ -162,6 +162,8 @@ function EditInvoiceContent({ id }: { id: string }) {
   /** IDs des lignes existantes, nécessaires pour la suppression avant recréation. */
   const [originalLineIds, setOriginalLineIds] = useState<string[]>([]);
 
+  const isDraft = invoiceStatut === '0';
+
   // --- État UI ---
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -298,15 +300,33 @@ function EditInvoiceContent({ id }: { id: string }) {
             product_type: line.product_type,
             desc: line.label,
             qty: Number(line.qty),
-            subprice: Number(line.subprice),
+            [typeParam === 'supplier' ? 'pu_ht' : 'subprice']: Number(
+              line.subprice
+            ),
             tva_tx: Number(line.tva_tx),
           });
         }
       }
 
       router.push(`/billing-payments/${id}?type=${typeParam}`);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
+    } catch (err: any) {
+      let message = getErrorMessage(err);
+
+      // Détection plus large de la référence en double pour les fournisseurs
+      const rawData = err?.response?.data
+        ? JSON.stringify(err.response.data).toLowerCase()
+        : '';
+      const isDuplicate =
+        rawData.includes('already exists') ||
+        rawData.includes('refsupplieralreadyexists') ||
+        rawData.includes('duplicate') ||
+        (typeParam === 'supplier' && message.includes('Error creating invoice'));
+
+      if (typeParam === 'supplier' && isDuplicate) {
+        message = 'La référence facture fournisseur existe déjà';
+      }
+
+      setError(message);
       setSaving(false);
     }
   };
@@ -318,25 +338,21 @@ function EditInvoiceContent({ id }: { id: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-muted text-center text-sm">
-          Chargement de la fiche d'édition...
-        </p>
+        <div className="border-primary h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
       </div>
     );
   }
 
-  const isDraft = invoiceStatut === '0';
-
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8 pb-20">
       {/* En-tête */}
-      <div className="border-border flex items-center justify-between border-b pb-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-foreground text-2xl font-bold tracking-tight">
+          <h1 className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
             Modifier la facture {invoiceRef}
           </h1>
           <p className="text-muted mt-1 text-sm">
-            Modification de l'état, des dates et des lignes de la facture.
+            Facture {invoiceStatut === '0' ? 'Brouillon' : 'Validée'}
           </p>
         </div>
         <button
@@ -348,13 +364,26 @@ function EditInvoiceContent({ id }: { id: string }) {
         </button>
       </div>
 
-      {/* Message d'erreur */}
+      {/* Message d'erreur (Style Sombre Premium) */}
       {error && (
         <div
-          className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset"
+          className="rounded-xl border border-red-800/10 bg-red-900/30 p-4 text-sm text-red-400 shadow-lg backdrop-blur-sm"
           role="alert"
         >
-          {error}
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-5 w-5 flex-shrink-0"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <p className="font-medium">{error}</p>
+          </div>
         </div>
       )}
 

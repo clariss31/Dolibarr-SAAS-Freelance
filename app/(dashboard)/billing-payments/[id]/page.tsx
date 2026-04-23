@@ -110,7 +110,11 @@ function StatusBadge({
     case 2: {
       const totalTtc = Math.round((Number(invoice.total_ttc) || 0) * 100) / 100;
       const payeArrondi = Math.round(sommePaye * 100) / 100;
-      const isPartiallyPaidResult = payeArrondi < totalTtc - 0.01;
+
+      // Priorité au champ 'paye' de Dolibarr (1 = entièrement réglé)
+      const isFullyPaidByDolibarr = Number(invoice.paye) === 1;
+      const isPartiallyPaidResult =
+        !isFullyPaidByDolibarr && payeArrondi < totalTtc - 0.01;
 
       if (isPartiallyPaidResult) {
         return (
@@ -281,38 +285,40 @@ function InvoiceDetailContent({ id }: { id: string }) {
     if (!id || !endpoint) return;
     const fetchPayments = async () => {
       try {
-        if (endpoint === '/invoices') {
-          const res = await api.get(`/invoices/${id}/payments`);
-          if (Array.isArray(res.data)) {
-            // Tentative de résolution des comptes bancaires manquants via fk_bank_line
-            const resolvedPayments = await Promise.all(
-              res.data.map(async (p: any) => {
-                // Si fk_bank est absent mais fk_bank_line est présent, on cherche le détail de la ligne
-                if (!p.fk_bank && p.fk_bank_line) {
-                  try {
-                    const lineRes = await api.get(
-                      `/bankaccounts/lines/${p.fk_bank_line}`
-                    );
-                    if (
-                      lineRes.data &&
-                      (lineRes.data.fk_account || lineRes.data.fk_bank_account)
-                    ) {
-                      return {
-                        ...p,
-                        fk_bank:
-                          lineRes.data.fk_account ||
-                          lineRes.data.fk_bank_account,
-                      };
-                    }
-                  } catch {
-                    // Si l'appel échoue, on garde le paiement tel quel
+        const res = await api.get(`${endpoint}/${id}/payments`);
+        if (Array.isArray(res.data)) {
+          // Résolution des comptes bancaires via fk_bank_line si fk_bank est absent
+          // Cette logique est nécessaire car Dolibarr ne renvoie pas toujours l'ID du compte directement
+          const resolvedPayments = await Promise.all(
+            res.data.map(async (p: any) => {
+              // On tente de trouver l'ID du compte dans divers champs possibles
+              let bankId =
+                p.fk_bank ?? p.fk_account ?? p.account_id ?? p.accountid;
+
+              if (!bankId && p.fk_bank_line) {
+                try {
+                  const lineRes = await api.get(
+                    `/bankaccounts/lines/${p.fk_bank_line}`
+                  );
+                  if (
+                    lineRes.data &&
+                    (lineRes.data.fk_account || lineRes.data.fk_bank_account)
+                  ) {
+                    bankId =
+                      lineRes.data.fk_account || lineRes.data.fk_bank_account;
                   }
+                } catch {
+                  /* Silencieux */
                 }
-                return p;
-              })
-            );
-            setPayments(resolvedPayments);
-          }
+              }
+
+              return {
+                ...p,
+                fk_bank: bankId,
+              };
+            })
+          );
+          setPayments(resolvedPayments);
         }
       } catch {
         // Silencieux
@@ -420,6 +426,27 @@ function InvoiceDetailContent({ id }: { id: string }) {
     setError('');
     try {
       await api.post(`${endpoint}/${id}/settounpaid`, { idwarehouse: 0 });
+      window.location.reload();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+      setIsDeleting(false);
+    }
+  };
+
+  /** Classe la facture en "Payée" directement */
+  const handleClasserPayee = async () => {
+    if (
+      !window.confirm(
+        'Voulez-vous vraiment classer cette facture comme payée ?'
+      )
+    ) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setError('');
+    try {
+      await api.post(`${endpoint}/${id}/settopaid`);
       window.location.reload();
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -584,11 +611,26 @@ function InvoiceDetailContent({ id }: { id: string }) {
   const totalTva = Number(invoice.total_tva) || totalTtc - totalHt;
 
   // Calcul du mont déjà réglé et du reste à payer à partir des règlements chargés
-  const sommePaye = payments.reduce(
+  // Calcul du montant déjà réglé : on prend le max entre la somme des règlements chargés
+  // et les champs de cumul retournés par Dolibarr (selon les versions et types de factures).
+  const sommePayeRèglements = payments.reduce(
     (acc, p) => acc + (Number(p.amount) || 0),
     0
   );
-  const resteAPayer = Math.max(0, totalTtc - sommePaye);
+  const sommePayeFacture = Number(
+    invoice.already_payed ??
+      invoice.sumpayed ??
+      (invoice as any).total_paid ??
+      (invoice as any).totalpaid ??
+      0
+  );
+  const sommePaye = Math.max(sommePayeRèglements, sommePayeFacture);
+
+  // Si la facture est payée (statut 2), le reste à payer est 0 même si la somme des paiements < total TTC
+  // La différence est considérée comme une remise/escompte de clôture.
+  const isPaid = Number(invoice.statut) === 2;
+  const resteAPayer = isPaid ? 0 : Math.max(0, totalTtc - sommePaye);
+  const remiseCloture = isPaid ? Math.max(0, totalTtc - sommePaye) : 0;
 
   // Détection du conflit Caisse vs Mode de paiement non-espèce
   const selectedBankData = bankAccounts.find(
@@ -662,20 +704,47 @@ function InvoiceDetailContent({ id }: { id: string }) {
           {/* Si Impayée (1) OU Règlement commencé on peut saisir un nouveau règlement ou abandonner */}
           {Number(invoice.statut) === 1 && (
             <>
-              <button
-                disabled={isDeleting}
-                onClick={handleOpenPayment}
-                className="inline-flex cursor-pointer justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-600 transition-colors ring-inset hover:bg-emerald-700 disabled:opacity-50"
-              >
-                Saisir un règlement
-              </button>
-              <button
-                disabled={isDeleting}
-                onClick={handleCancel}
-                className="inline-flex cursor-pointer justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-gray-300 transition-colors ring-inset hover:bg-red-50 disabled:opacity-50 dark:bg-gray-800 dark:text-red-400 dark:ring-gray-700 dark:hover:bg-red-900/30"
-              >
-                Abandonner
-              </button>
+              {totalTtc !== 0 && (
+                <button
+                  disabled={isDeleting}
+                  onClick={handleOpenPayment}
+                  className="inline-flex cursor-pointer justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-600 transition-colors ring-inset hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  Saisir un règlement
+                </button>
+              )}
+
+              {/* Classer payée : seulement si le montant est de 0 € */}
+              {totalTtc === 0 && (
+                <button
+                  disabled={isDeleting}
+                  onClick={handleClasserPayee}
+                  className="inline-flex cursor-pointer justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-emerald-600 shadow-sm ring-1 ring-gray-300 transition-colors ring-inset hover:bg-emerald-50 disabled:opacity-50 dark:bg-gray-800 dark:text-emerald-400 dark:ring-gray-700 dark:hover:bg-emerald-900/30"
+                >
+                  Classer payée
+                </button>
+              )}
+
+              {totalTtc !== 0 && sommePaye === 0 && (
+                <button
+                  disabled={isDeleting}
+                  onClick={handleCancel}
+                  className="inline-flex cursor-pointer justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-gray-300 transition-colors ring-inset hover:bg-red-50 disabled:opacity-50 dark:bg-gray-800 dark:text-red-400 dark:ring-gray-700 dark:hover:bg-red-900/30"
+                >
+                  Abandonner
+                </button>
+              )}
+
+              {/* Suppression autorisée pour les fournisseurs seulement si AUCUN règlement n'a commencé */}
+              {typeParam === 'supplier' && sommePaye === 0 && (
+                <button
+                  disabled={isDeleting}
+                  onClick={handleDelete}
+                  className="text-sm font-semibold text-red-600 transition-colors hover:text-red-800 disabled:opacity-50"
+                >
+                  {isDeleting ? '...' : 'Supprimer'}
+                </button>
+              )}
 
               {/* Bouton Classer Payée partiellement (si règlement commencé) */}
               {sommePaye > 0 && resteAPayer > 0 && (
@@ -713,6 +782,31 @@ function InvoiceDetailContent({ id }: { id: string }) {
             </h3>
           </div>
           <div className="space-y-4 p-5">
+            {/* Tiers associé */}
+            <div>
+              <p className="text-muted text-xs font-medium tracking-wider uppercase">
+                {typeParam === 'supplier' ? 'Fournisseur' : 'Client'}
+              </p>
+              <Link
+                href={`/third-parties/${invoice.socid}`}
+                className="text-primary hover:text-primary/80 mt-1 block text-sm font-semibold transition-colors hover:underline"
+              >
+                {thirdPartyName}
+              </Link>
+            </div>
+
+            {/* Référence fournisseur (si présente) */}
+            {invoice.ref_supplier && (
+              <div>
+                <p className="text-muted text-xs font-medium tracking-wider uppercase">
+                  Réf. facture fournisseur
+                </p>
+                <p className="text-foreground mt-1 text-sm font-medium">
+                  {invoice.ref_supplier}
+                </p>
+              </div>
+            )}
+
             {/* Date de facturation */}
             <div>
               <p className="text-muted text-xs font-medium tracking-wider uppercase">
@@ -741,31 +835,6 @@ function InvoiceDetailContent({ id }: { id: string }) {
                 )}
               </div>
             </div>
-
-            {/* Tiers associé */}
-            <div>
-              <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                Tiers
-              </p>
-              <Link
-                href={`/third-parties/${invoice.socid}`}
-                className="text-primary hover:text-primary/80 mt-1 block text-sm font-semibold transition-colors hover:underline"
-              >
-                {thirdPartyName}
-              </Link>
-            </div>
-
-            {/* Référence fournisseur (si présente) */}
-            {invoice.ref_supplier && (
-              <div>
-                <p className="text-muted text-xs font-medium tracking-wider uppercase">
-                  Réf. fournisseur
-                </p>
-                <p className="text-foreground mt-1 text-sm font-medium">
-                  {invoice.ref_supplier}
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
@@ -929,6 +998,14 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     {formatCurrency(totalTtc)}
                   </span>
                 </div>
+                {remiseCloture > 0 && (
+                  <div className="flex items-center justify-between text-sm text-emerald-600 italic dark:text-emerald-400">
+                    <span>Remise / Escompte (clôture)</span>
+                    <span className="font-medium">
+                      -{formatCurrency(remiseCloture)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-base font-bold">
                   <span className="text-foreground">Reste à payer</span>
                   <span
@@ -1320,7 +1397,9 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
                   />
                   <span className="text-foreground text-sm">
-                    Mauvais payeur
+                    {typeParam === 'supplier'
+                      ? 'Mauvais vendeur'
+                      : 'Mauvais payeur'}
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-3">
@@ -1418,7 +1497,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
               <button
                 onClick={() => setShowPartialModal(false)}
                 className="text-muted hover:text-foreground transition-colors"
-                title="Fermer"
+                aria-label="Fermer"
               >
                 <svg
                   className="h-6 w-6"
@@ -1437,132 +1516,82 @@ function InvoiceDetailContent({ id }: { id: string }) {
             </div>
 
             <form onSubmit={submitPartialPaid} className="space-y-6 p-6">
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-                <p className="mb-1 font-semibold">Attention</p>
-                <p>
-                  Cette facture n'a pas été payée à hauteur du montant initial.
-                  Pour quelle raison voulez-vous la classer malgré tout ? Le
-                  reste à payer est de{' '}
-                  <strong>{formatCurrency(resteAPayer)}</strong>.
-                </p>
+              <p className="text-foreground text-sm leading-relaxed">
+                Cette facture n'a pas été payée à hauteur du montant initial.
+                Pour quelle raison voulez-vous la classer malgré tout ?
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="radio"
+                      name="partialReason"
+                      value="DISCOUNT"
+                      checked={partialReason === 'DISCOUNT'}
+                      onChange={(e) => setPartialReason(e.target.value)}
+                      className="text-primary focus:ring-primary mt-1 h-4 w-4 border-gray-300"
+                    />
+                    <div className="text-sm">
+                      <p className="text-foreground">
+                        Le reste à payer (
+                        <strong>{formatCurrency(resteAPayer)}</strong>) est un
+                        escompte accordé parce que le paiement a été effectué
+                        avant terme.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="radio"
+                      name="partialReason"
+                      value="BADDEBT"
+                      checked={partialReason === 'BADDEBT'}
+                      onChange={(e) => setPartialReason(e.target.value)}
+                      className="text-primary focus:ring-primary mt-1 h-4 w-4 border-gray-300"
+                    />
+                    <div className="text-sm">
+                      <p className="text-foreground">
+                        {typeParam === 'supplier'
+                          ? 'Mauvais vendeur'
+                          : 'Mauvais payeur'}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="radio"
+                      name="partialReason"
+                      value="OTHER"
+                      checked={partialReason === 'OTHER'}
+                      onChange={(e) => setPartialReason(e.target.value)}
+                      className="text-primary focus:ring-primary mt-1 h-4 w-4 border-gray-300"
+                    />
+                    <div className="text-sm">
+                      <p className="text-foreground">Autre</p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="partialReason"
-                    value="DISCOUNT"
-                    checked={partialReason === 'DISCOUNT'}
-                    onChange={(e) => setPartialReason(e.target.value)}
-                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
-                  />
-                  <div className="text-sm">
-                    <p className="text-foreground font-medium">
-                      Escompte accordé
-                    </p>
-                    <p className="text-muted text-xs">
-                      Paiement effectué avant terme.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="partialReason"
-                    value="BADDEBT"
-                    checked={partialReason === 'BADDEBT'}
-                    onChange={(e) => setPartialReason(e.target.value)}
-                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
-                  />
-                  <div className="text-sm">
-                    <p className="text-foreground font-medium">
-                      Mauvais payeur
-                    </p>
-                    <p className="text-muted text-xs">Dette irrécouvrable.</p>
-                  </div>
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="partialReason"
-                    value="BANKFEE"
-                    checked={partialReason === 'BANKFEE'}
-                    onChange={(e) => setPartialReason(e.target.value)}
-                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
-                  />
-                  <div className="text-sm">
-                    <p className="text-foreground font-medium">
-                      Prélèvement par banque
-                    </p>
-                    <p className="text-muted text-xs">
-                      Frais de banque intermédiaire.
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="partialReason"
-                    value="TAX"
-                    checked={partialReason === 'TAX'}
-                    onChange={(e) => setPartialReason(e.target.value)}
-                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
-                  />
-                  <div className="text-sm">
-                    <p className="text-foreground font-medium">
-                      Taxe retenue à la source
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="partialReason"
-                    value="OTHER"
-                    checked={partialReason === 'OTHER'}
-                    onChange={(e) => setPartialReason(e.target.value)}
-                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
-                  />
-                  <div className="text-sm">
-                    <p className="text-foreground font-medium">Autre</p>
-                  </div>
-                </label>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="partialComment"
-                  className="text-foreground mb-1 block text-sm font-medium"
-                >
-                  Commentaire / Note de clôture
-                </label>
-                <textarea
-                  id="partialComment"
-                  rows={3}
-                  value={partialComment}
-                  onChange={(e) => setPartialComment(e.target.value)}
-                  placeholder="Informations complémentaires..."
-                  className="border-border bg-background focus:ring-primary block w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none dark:bg-gray-800 dark:text-white"
-                />
-              </div>
-
-              <div className="border-border flex flex-row-reverse gap-3 border-t pt-6">
+              <div className="border-border flex justify-end gap-3 border-t pt-6">
                 <button
                   type="submit"
                   disabled={isSubmittingPartial}
-                  className="btn-primary px-5 py-2 transition-all disabled:opacity-50"
+                  className="inline-flex justify-center rounded-md bg-white px-6 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
-                  {isSubmittingPartial ? 'Traitement...' : 'Oui, classer payée'}
+                  {isSubmittingPartial ? 'Traitement...' : 'Oui'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowPartialModal(false)}
-                  className="inline-flex justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 dark:hover:bg-gray-700"
+                  className="inline-flex justify-center rounded-md bg-white px-6 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 transition-colors hover:bg-gray-50"
                 >
                   Non
                 </button>

@@ -134,8 +134,13 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
       );
     case 1: {
       const invAny = invoice as any;
-      // 'totalpaid' est le champ exact identifié sur votre serveur
-      const sommePaye = Number(invAny.totalpaid) || 0;
+      const sommePaye = Number(
+        invAny.already_payed ??
+          invAny.sumpayed ??
+          invAny.total_paid ??
+          invAny.totalpaid ??
+          0
+      );
 
       if (sommePaye > 0) {
         return (
@@ -153,8 +158,17 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
     case 2: {
       const invAny = invoice as any;
       const totalTtc = Number(invAny.total_ttc) || 0;
-      const sommePaye = Number(invAny.totalpaid) || 0;
-      const isPartiallyPaid = sommePaye < totalTtc - 0.001; // Tolérance pour les arrondis
+      const sommePaye = Number(
+        invAny.already_payed ??
+          invAny.sumpayed ??
+          invAny.total_paid ??
+          invAny.totalpaid ??
+          0
+      );
+      
+      // Priorité au champ 'paye' (1 = réglé)
+      const isFullyPaidByDolibarr = Number(invAny.paye) === 1;
+      const isPartiallyPaid = !isFullyPaidByDolibarr && sommePaye < totalTtc - 0.01;
 
       if (isPartiallyPaid) {
         return (
@@ -383,14 +397,27 @@ function BillingPaymentsContent() {
         // on affine côté client pour les séparer strictement.
         let finalInvoices = response.data;
         if (Array.isArray(finalInvoices)) {
+          const getSommePaye = (inv: any) =>
+            Number(
+              inv.already_payed ??
+                inv.sumpayed ??
+                inv.total_paid ??
+                inv.totalpaid ??
+                0
+            );
+
           if (statusFilter === 'part') {
-            finalInvoices = finalInvoices.filter(
-              (inv) => Number((inv as any).totalpaid) > 0
-            );
+            finalInvoices = finalInvoices.filter((inv) => {
+              const s = Number(inv.statut);
+              const p = getSommePaye(inv);
+              const isFullyPaid = Number(inv.paye) === 1;
+              // Partiel si : (statut 1 et payé > 0) OU (statut 2 et non payé entièrement)
+              return (s === 1 && p > 0) || (s === 2 && !isFullyPaid);
+            });
           } else if (statusFilter === '1') {
-            finalInvoices = finalInvoices.filter(
-              (inv) => Number((inv as any).totalpaid) === 0
-            );
+            finalInvoices = finalInvoices.filter((inv) => {
+              return Number(inv.statut) === 1 && getSommePaye(inv) === 0;
+            });
           }
         }
 

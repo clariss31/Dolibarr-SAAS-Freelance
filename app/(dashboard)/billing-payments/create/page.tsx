@@ -210,9 +210,10 @@ function CreateInvoiceForm() {
         // Pour les fournisseurs, on crée l'en-tête d'abord, puis les lignes une par une (plus robuste)
         const payload = {
           socid: parseInt(formData.socid, 10),
-          date: dateStringToTimestamp(formData.date),
-          date_echeance: dateStringToTimestamp(formData.datelimit),
+          date: formData.date, // Dolibarr v24 attend souvent une chaîne YYYY-MM-DD pour les fournisseurs
+          date_echeance: formData.datelimit,
           ref_supplier: formData.ref_supplier || `SUP-${Date.now()}`,
+          ref: 'auto',
           type: 0, // Facture standard
         };
         const response = await api.post(endpoint, payload);
@@ -225,14 +226,28 @@ function CreateInvoiceForm() {
             product_type: line.product_type,
             desc: line.label,
             qty: Number(line.qty),
-            subprice: Number(line.subprice),
+            pu_ht: Number(line.subprice), // Pour les fournisseurs, l'API utilise souvent pu_ht
             tva_tx: Number(line.tva_tx),
           });
         }
         router.push(`/billing-payments/${newId}?type=supplier`);
       }
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
+    } catch (err: any) {
+      let message = getErrorMessage(err);
+
+      // Détection plus large de la référence en double pour les fournisseurs
+      const rawData = err?.response?.data ? JSON.stringify(err.response.data).toLowerCase() : '';
+      const isDuplicate = 
+        rawData.includes('already exists') || 
+        rawData.includes('refsupplieralreadyexists') || 
+        rawData.includes('duplicate') ||
+        (invoiceType === 'supplier' && message.includes('Error creating invoice'));
+
+      if (invoiceType === 'supplier' && isDuplicate) {
+        message = 'La référence facture fournisseur existe déjà';
+      }
+
+      setError(message);
       setSaving(false);
     }
   };
@@ -262,13 +277,26 @@ function CreateInvoiceForm() {
         </button>
       </div>
 
-      {/* Message d'erreur */}
+      {/* Message d'erreur (Style Sombre Premium) */}
       {error && (
         <div
-          className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-inset ring-red-600/20"
+          className="rounded-xl border border-red-800/10 bg-red-900/30 p-4 text-sm text-red-400 shadow-lg backdrop-blur-sm"
           role="alert"
         >
-          {error}
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-5 w-5 flex-shrink-0"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <p className="font-medium">{error}</p>
+          </div>
         </div>
       )}
 
