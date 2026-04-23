@@ -63,8 +63,12 @@ export function getErrorMessage(error: unknown, context?: string): string {
 
   // 5. Gestion des erreurs réseau
   if (error instanceof Error) {
-    if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
-      return "Impossible d'établir une connexion avec le serveur. Vérifiez votre accès internet.";
+    if (error.message === 'Failed to fetch' || error.message.includes('NetworkError') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+      const apiUrl = process.env.NEXT_PUBLIC_DOLIBARR_API_URL;
+      if (!apiUrl) {
+        return "Configuration manquante : URL de l'API non définie.";
+      }
+      return "Impossible d'établir une connexion avec le serveur. Vérifiez votre accès internet ou l'URL de l'API.";
     }
   }
 

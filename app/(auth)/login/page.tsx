@@ -81,15 +81,13 @@ export default function LoginPage() {
 
         {/* Formulaire */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {/* Message d'erreur accessible */}
+          {/* Message d'erreur accessible (Style Rouge Premium) */}
           {error && (
             <div
-              className="rounded-md bg-red-50 p-4 dark:bg-red-900/30"
+              className="rounded-lg bg-[#2d1414] border border-red-900/50 p-4 text-sm text-[#ff6b6b] shadow-lg font-medium animate-in fade-in slide-in-from-top-2 duration-300"
               role="alert"
             >
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                {error}
-              </p>
+              {error}
             </div>
           )}
 

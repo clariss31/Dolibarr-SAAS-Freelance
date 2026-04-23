@@ -141,7 +141,10 @@ export default function ProductDetailsPage() {
         >
           &larr; Retour au catalogue
         </button>
-        <div className="rounded-md bg-red-50 p-4 text-red-800 ring-1 ring-red-600/20 ring-inset dark:bg-red-900/30 dark:text-red-200">
+        <div 
+          className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
+          role="alert"
+        >
           {error || 'Produit introuvable'}
         </div>
       </div>

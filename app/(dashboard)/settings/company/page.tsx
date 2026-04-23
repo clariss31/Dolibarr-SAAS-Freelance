@@ -87,12 +87,10 @@ export default function CompanySettingsPage() {
       {/* Alerte Erreur */}
       {error && (
         <div
-          className="rounded-md bg-red-50 p-4 dark:bg-red-900/30"
+          className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
-          <p className="text-sm font-medium text-red-800 dark:text-red-200">
-            {error}
-          </p>
+          {error}
         </div>
       )}
 
