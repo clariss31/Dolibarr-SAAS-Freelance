@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, Suspense } from 'react';
 import { useRouter, useSearchParams, notFound } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Invoice, InvoicePayment, ApiError } from '../../../../types/dolibarr';
@@ -746,10 +747,25 @@ function InvoiceDetailContent({ id }: { id: string }) {
               <p className="text-muted text-xs font-medium tracking-wider uppercase">
                 Tiers
               </p>
-              <p className="text-foreground mt-1 text-sm font-medium">
+              <Link
+                href={`/third-parties/${invoice.socid}`}
+                className="text-primary hover:text-primary/80 mt-1 block text-sm font-semibold transition-colors hover:underline"
+              >
                 {thirdPartyName}
-              </p>
+              </Link>
             </div>
+
+            {/* Référence fournisseur (si présente) */}
+            {invoice.ref_supplier && (
+              <div>
+                <p className="text-muted text-xs font-medium tracking-wider uppercase">
+                  Réf. fournisseur
+                </p>
+                <p className="text-foreground mt-1 text-sm font-medium">
+                  {invoice.ref_supplier}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -947,15 +963,21 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     </th>
                     <th
                       scope="col"
+                      className="text-foreground px-3 py-3.5 text-right text-sm font-semibold"
+                    >
+                      P.U. HT
+                    </th>
+                    <th
+                      scope="col"
                       className="text-foreground px-3 py-3.5 text-center text-sm font-semibold"
                     >
                       TVA
                     </th>
                     <th
                       scope="col"
-                      className="text-foreground px-3 py-3.5 text-right text-sm font-semibold"
+                      className="text-foreground px-3 py-3.5 text-center text-sm font-semibold"
                     >
-                      P.U. HT
+                      Remise
                     </th>
                     <th
                       scope="col"
@@ -981,8 +1003,9 @@ function InvoiceDetailContent({ id }: { id: string }) {
                       '-';
                     const tva = Number(line.tva_tx) || 0;
                     const puHt = Number(line.subprice) || 0;
+                    const remise = Number(line.remise_percent) || 0;
                     const qty = Number(line.qty) || 1;
-                    const lineTotalHt = Number(line.total_ht) || puHt * qty;
+                    const lineTotalHt = Number(line.total_ht) || puHt * qty * (1 - remise / 100);
 
                     return (
                       <tr
@@ -994,11 +1017,14 @@ function InvoiceDetailContent({ id }: { id: string }) {
                             {description}
                           </div>
                         </td>
+                        <td className="text-muted px-3 py-4 text-right align-top text-sm whitespace-nowrap">
+                          {formatCurrency(puHt)}
+                        </td>
                         <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
                           {tva}%
                         </td>
-                        <td className="text-muted px-3 py-4 text-right align-top text-sm whitespace-nowrap">
-                          {formatCurrency(puHt)}
+                        <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
+                          {remise > 0 ? `${remise}%` : '-'}
                         </td>
                         <td className="text-muted px-3 py-4 text-center align-top text-sm whitespace-nowrap">
                           {qty}

@@ -89,6 +89,7 @@ function CreateInvoiceForm() {
     socid:     '',
     date:      getToday(),
     datelimit: getDateInDays(30),
+    ref_supplier: '',
   });
 
   // --- État des lignes ---
@@ -114,34 +115,45 @@ function CreateInvoiceForm() {
    * Silencieux en cas d'erreur : le select affichera simplement vide.
    */
   const fetchThirdParties = useCallback(async (type: InvoiceType) => {
-    setLoadingThirdParties(true);
-    setThirdParties([]);
-    // Réinitialisation du tiers sélectionné lors du changement de type
-    setFormData((prev) => ({ ...prev, socid: '' }));
-
     try {
       const filter =
         type === 'client'
           ? 'sqlfilters=(t.client:>:0)'
-          : 'sqlfilters=(t.fournisseur:=:1)';
+          : 'sqlfilters=(t.fournisseur:>=:1)';
 
       const response = await api.get(
-        `/thirdparties?sortfield=t.nom&sortorder=ASC&limit=500&${filter}`
+        `/thirdparties?sortfield=t.nom&sortorder=ASC&limit=1000&${filter}`
       );
 
-      if (Array.isArray(response.data)) {
-        setThirdParties(response.data);
-      }
+      return Array.isArray(response.data) ? response.data : [];
     } catch {
-      // Erreur silencieuse — le select affichera «aucun tiers»
-    } finally {
-      setLoadingThirdParties(false);
+      return [];
     }
   }, []);
 
   /** Recharge la liste des tiers à chaque changement de type de facture. */
   useEffect(() => {
-    fetchThirdParties(invoiceType);
+    let isMounted = true;
+
+    const load = async () => {
+      setLoadingThirdParties(true);
+      setThirdParties([]);
+      // Réinitialisation du tiers sélectionné lors du changement de type
+      setFormData((prev) => ({ ...prev, socid: '' }));
+
+      const data = await fetchThirdParties(invoiceType);
+
+      if (isMounted) {
+        setThirdParties(data);
+        setLoadingThirdParties(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      isMounted = false;
+    };
   }, [invoiceType, fetchThirdParties]);
 
   // ---------------------------------------------------------------------------
@@ -173,26 +185,52 @@ function CreateInvoiceForm() {
     setSaving(true);
     setError('');
 
-    const endpoint = invoiceType === 'supplier' ? '/supplierinvoices' : '/invoices';
-
-    const payload = {
-      socid:     parseInt(formData.socid, 10),
-      date:      dateStringToTimestamp(formData.date),
-      date_lim_reglement: dateStringToTimestamp(formData.datelimit),
-      lines: lines.map((line) => ({
-        fk_product:   line.fk_product ? parseInt(line.fk_product, 10) : 0,
-        product_type: line.product_type,
-        desc:         line.label,
-        qty:          Number(line.qty),
-        subprice:     Number(line.subprice),
-        tva_tx:       Number(line.tva_tx),
-      })),
-    };
-
     try {
-      const response = await api.post(endpoint, payload);
-      const newId = response.data as string | number;
-      router.push(`/billing-payments/${newId}?type=${invoiceType}`);
+      const endpoint = invoiceType === 'supplier' ? '/supplierinvoices' : '/invoices';
+
+      if (invoiceType === 'client') {
+        // Pour les clients, l'API accepte généralement les lignes dans le POST initial
+        const payload = {
+          socid: parseInt(formData.socid, 10),
+          date: dateStringToTimestamp(formData.date),
+          date_lim_reglement: dateStringToTimestamp(formData.datelimit),
+          lines: lines.map((line) => ({
+            fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
+            product_type: line.product_type,
+            desc: line.label,
+            qty: Number(line.qty),
+            subprice: Number(line.subprice),
+            tva_tx: Number(line.tva_tx),
+          })),
+        };
+        const response = await api.post(endpoint, payload);
+        const newId = response.data as string | number;
+        router.push(`/billing-payments/${newId}?type=client`);
+      } else {
+        // Pour les fournisseurs, on crée l'en-tête d'abord, puis les lignes une par une (plus robuste)
+        const payload = {
+          socid: parseInt(formData.socid, 10),
+          date: dateStringToTimestamp(formData.date),
+          date_echeance: dateStringToTimestamp(formData.datelimit),
+          ref_supplier: formData.ref_supplier || `SUP-${Date.now()}`,
+          type: 0, // Facture standard
+        };
+        const response = await api.post(endpoint, payload);
+        const newId = response.data as string | number;
+
+        // Ajout séquentiel des lignes
+        for (const line of lines) {
+          await api.post(`${endpoint}/${newId}/lines`, {
+            fk_product: line.fk_product ? parseInt(line.fk_product, 10) : 0,
+            product_type: line.product_type,
+            desc: line.label,
+            qty: Number(line.qty),
+            subprice: Number(line.subprice),
+            tva_tx: Number(line.tva_tx),
+          });
+        }
+        router.push(`/billing-payments/${newId}?type=supplier`);
+      }
     } catch (err: unknown) {
       setError(getErrorMessage(err));
       setSaving(false);
@@ -305,6 +343,30 @@ function CreateInvoiceForm() {
               </div>
             </div>
           </div>
+
+          {/* Réf. Fournisseur (Uniquement si type fournisseur) */}
+          {invoiceType === 'supplier' && (
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="ref_supplier"
+                className="text-foreground block text-sm leading-6 font-medium"
+              >
+                Référence facture fournisseur *
+              </label>
+              <div className="mt-2">
+                <input
+                  type="text"
+                  id="ref_supplier"
+                  name="ref_supplier"
+                  required
+                  placeholder="Ex: FA-2024-0001"
+                  value={formData.ref_supplier}
+                  onChange={handleChange}
+                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md border-0 px-3 py-2 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Date de facturation */}
           <div>

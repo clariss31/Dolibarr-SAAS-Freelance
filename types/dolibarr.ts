@@ -125,6 +125,7 @@ export interface Invoice {
   sumpayed?: number | string;
   already_payed?: number | string;
   remaintopay?: number | string;
+  ref_supplier?: string;
   lines?: ProposalLine[];
 }
 

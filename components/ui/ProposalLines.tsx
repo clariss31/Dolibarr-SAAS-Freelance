@@ -90,11 +90,14 @@ export default function ProposalLines({
     fetchProducts();
 
     // Vérification de l'assujettissement à la TVA
-    api.get('/setup/company').then((res) => {
-      if (res.data) {
-        setIsTvaAssujetti(String(res.data.tva_assuj) === '1');
-      }
-    }).catch(() => {});
+    api
+      .get('/setup/company')
+      .then((res) => {
+        if (res.data) {
+          setIsTvaAssujetti(String(res.data.tva_assuj) === '1');
+        }
+      })
+      .catch(() => {});
   }, []);
 
   /** Ajoute une ligne avec le produit sélectionné */
@@ -105,7 +108,7 @@ export default function ProposalLines({
 
     const qty = selectedQty > 0 ? selectedQty : 1;
     const subprice = Number(product.price) || 0;
-    const tva_tx = isTvaAssujetti ? (Number(product.tva_tx) || 0) : 0;
+    const tva_tx = isTvaAssujetti ? Number(product.tva_tx) || 0 : 0;
     const remise_percent = 0;
     const base_ht = qty * subprice;
     const total_ht = parseFloat(
@@ -256,7 +259,7 @@ export default function ProposalLines({
                           }}
                           className={`hover:bg-primary/10 group relative cursor-pointer px-3 py-2 select-none ${
                             selectedProductId === p.id
-                              ? 'bg-primary/20 font-semibold text-primary'
+                              ? 'bg-primary/20 text-primary font-semibold'
                               : 'text-foreground'
                           }`}
                         >
@@ -329,7 +332,7 @@ export default function ProposalLines({
                   scope="col"
                   className="text-foreground px-4 py-3 text-right font-medium"
                 >
-                  Prix unit. HT
+                  P.U. HT
                 </th>
                 <th
                   scope="col"
@@ -386,7 +389,11 @@ export default function ProposalLines({
                           )
                         }
                         disabled={!isTvaAssujetti}
-                        title={!isTvaAssujetti ? "L'entreprise n'est pas assujettie à la TVA" : undefined}
+                        title={
+                          !isTvaAssujetti
+                            ? "L'entreprise n'est pas assujettie à la TVA"
+                            : undefined
+                        }
                         className={`bg-background text-foreground ring-border focus:ring-primary w-24 rounded-md px-2 py-1 text-right text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset ${
                           !isTvaAssujetti ? 'cursor-not-allowed opacity-50' : ''
                         }`}

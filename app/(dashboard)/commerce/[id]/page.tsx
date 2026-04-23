@@ -653,7 +653,7 @@ export default function CommerceDetailsPage() {
                           scope="col"
                           className="text-foreground px-4 py-3 text-right font-medium"
                         >
-                          Prix HT
+                          P.U. HT
                         </th>
                         <th
                           scope="col"
