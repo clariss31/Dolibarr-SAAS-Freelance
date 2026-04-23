@@ -134,13 +134,30 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
       );
     case 1: {
       const invAny = invoice as any;
-      const sommePaye = Number(
+      const totalTtc = Number(invAny.total_ttc) || 0;
+      const remaintopay =
+        invAny.remaintopay !== undefined
+          ? Number(invAny.remaintopay)
+          : undefined;
+
+      let sommePaye = Number(
         invAny.already_payed ??
           invAny.sumpayed ??
           invAny.total_paid ??
           invAny.totalpaid ??
+          invAny.paid ??
+          invAny.total_paye ??
           0
       );
+
+      // Fallback puissant : si remaintopay est présent et cohérent, on en déduit le payé
+      if (
+        sommePaye === 0 &&
+        remaintopay !== undefined &&
+        remaintopay < totalTtc
+      ) {
+        sommePaye = Math.max(0, totalTtc - remaintopay);
+      }
 
       if (sommePaye > 0) {
         return (
@@ -165,10 +182,11 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
           invAny.totalpaid ??
           0
       );
-      
+
       // Priorité au champ 'paye' (1 = réglé)
       const isFullyPaidByDolibarr = Number(invAny.paye) === 1;
-      const isPartiallyPaid = !isFullyPaidByDolibarr && sommePaye < totalTtc - 0.01;
+      const isPartiallyPaid =
+        !isFullyPaidByDolibarr && sommePaye < totalTtc - 0.01;
 
       if (isPartiallyPaid) {
         return (
@@ -478,11 +496,13 @@ function BillingPaymentsContent() {
           `((t.ref:like:'%${safe}%') or (s.nom:like:'%${safe}%'))`
         );
       }
-      if (startDate) conditions.push(`(t.datef:>:'${shiftDate(startDate, -1)}')`);
+      if (startDate)
+        conditions.push(`(t.datef:>:'${shiftDate(startDate, -1)}')`);
       if (endDate) conditions.push(`(t.datef:<:'${shiftDate(endDate, 1)}')`);
 
       const dueField = 't.date_lim_reglement';
-      if (startDue) conditions.push(`(${dueField}:>:'${shiftDate(startDue, -1)}')`);
+      if (startDue)
+        conditions.push(`(${dueField}:>:'${shiftDate(startDue, -1)}')`);
       if (endDue) conditions.push(`(${dueField}:<:'${shiftDate(endDue, 1)}')`);
 
       let query = `${endpoint}?limit=1000`;
