@@ -18,21 +18,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
 import { getErrorMessage } from '../../../utils/error-handler';
 import { Product, ApiError } from '../../../types/dolibarr';
-
-// ---------------------------------------------------------------------------
-// Helpers (Extract outside component for purity and performance)
-// ---------------------------------------------------------------------------
-
-/** Formate un montant en Euros. */
-function formatCurrency(price: string | number | undefined): string {
-  if (price === undefined) return '0,00 €';
-  const num = typeof price === 'string' ? parseFloat(price) : Number(price);
-  if (isNaN(num)) return '0,00 €';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(num);
-}
+import { formatCurrency } from '../../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -162,8 +148,8 @@ export default function ProductsServicesPage() {
       </div>
 
       {error && (
-        <div 
-          className="rounded-lg bg-[#2d1414] border border-red-900/50 p-4 text-sm text-[#ff6b6b] shadow-lg font-medium animate-in fade-in slide-in-from-top-2 duration-300"
+        <div
+          className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
           {error}
@@ -199,7 +185,9 @@ export default function ProductsServicesPage() {
       {/* Barre de recherche */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
         <div className="max-w-md flex-1">
-          <label htmlFor="search" className="sr-only">Rechercher un produit ou service</label>
+          <label htmlFor="search" className="sr-only">
+            Rechercher un produit ou service
+          </label>
           <input
             id="search"
             type="search"

@@ -20,9 +20,13 @@ import { getErrorMessage } from '../../../../../utils/error-handler';
 import ProposalLines, {
   LocalLine,
 } from '../../../../../components/ui/ProposalLines';
+import {
+  timestampToDateString,
+  dateStringToTimestamp,
+} from '../../../../../utils/format';
 
 // ---------------------------------------------------------------------------
-// Helpers (Extract outside component for better performance/purity)
+// Helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -66,28 +70,6 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
     total_ht: totalHt,
     total_ttc: totalTtc,
   };
-}
-
-/**
- * Convertit un timestamp (secondes) en chaîne YYYY-MM-DD pour les inputs HTML5.
- */
-function timestampToDateString(ts: string | number | undefined): string {
-  if (!ts) return '';
-  const date = new Date(Number(ts) * 1000);
-  // Utiliser les composants locaux pour éviter les sauts de date liés à l'UTC
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-/**
- * Convertit une chaîne YYYY-MM-DD en timestamp (secondes).
- */
-function dateStringToTimestamp(dateStr: string): number | null {
-  if (!dateStr) return null;
-  // Utiliser midi pour éviter les décalages de fuseau horaire (évite le passage au jour précédent)
-  return Math.floor(new Date(dateStr + 'T12:00:00').getTime() / 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,9 +164,7 @@ export default function EditCommercePage() {
   // --- Handlers ---
 
   /** Mise à jour des champs date */
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -198,7 +178,10 @@ export default function EditCommercePage() {
     const dateStart = new Date(formData.datep + 'T12:00:00');
     const dateEnd = new Date(formData.fin_validite + 'T12:00:00');
     const diffTime = dateEnd.getTime() - dateStart.getTime();
-    const dureeValidite = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const dureeValidite = Math.max(
+      0,
+      Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    );
 
     const payload = {
       // On conserve le statut actuel sans le modifier ici (géré via les boutons d'action)
@@ -246,24 +229,6 @@ export default function EditCommercePage() {
     }
   };
 
-  /** Suppression définitive du devis */
-  const handleDelete = async () => {
-    if (
-      !window.confirm(
-        'Voulez-vous supprimer ce devis ? Cette action est irréversible.'
-      )
-    )
-      return;
-
-    setError('');
-    try {
-      await api.delete(`/proposals/${id}`);
-      router.push('/commerce');
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
-    }
-  };
-
   // --- Rendu ---
 
   if (loading) {
@@ -299,7 +264,7 @@ export default function EditCommercePage() {
       </div>
 
       {error && (
-        <div 
+        <div
           className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
@@ -328,14 +293,38 @@ export default function EditCommercePage() {
 
           {/* Statut affiché en lecture seule (modifiable via les boutons de la fiche détail) */}
           <div className="sm:col-span-2">
-            <p className="text-foreground mb-2 block text-sm font-medium">État du devis</p>
+            <p className="text-foreground mb-2 block text-sm font-medium">
+              État du devis
+            </p>
             <div className="flex items-center gap-2">
-              {statut === '0' && <span className="inline-flex items-center rounded-md bg-slate-50 px-2.5 py-1 text-sm font-medium text-slate-600 ring-1 ring-slate-500/10 ring-inset dark:bg-slate-400/10 dark:text-slate-400">Brouillon</span>}
-              {statut === '1' && <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-700 ring-1 ring-blue-700/10 ring-inset dark:bg-blue-400/10 dark:text-blue-400">Ouvert</span>}
-              {statut === '2' && <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset dark:bg-emerald-500/10 dark:text-emerald-400">Signé</span>}
-              {statut === '3' && <span className="inline-flex items-center rounded-md bg-red-50 px-2.5 py-1 text-sm font-medium text-red-700 ring-1 ring-red-600/10 ring-inset dark:bg-red-400/10 dark:text-red-400">Non signé</span>}
-              {statut === '4' && <span className="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-sm font-medium text-purple-700 ring-1 ring-purple-700/10 ring-inset dark:bg-purple-400/10 dark:text-purple-400">Facturé</span>}
-              <span className="text-muted text-xs">(Le statut se modifie depuis la fiche du devis)</span>
+              {statut === '0' && (
+                <span className="inline-flex items-center rounded-md bg-slate-50 px-2.5 py-1 text-sm font-medium text-slate-600 ring-1 ring-slate-500/10 ring-inset dark:bg-slate-400/10 dark:text-slate-400">
+                  Brouillon
+                </span>
+              )}
+              {statut === '1' && (
+                <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-700 ring-1 ring-blue-700/10 ring-inset dark:bg-blue-400/10 dark:text-blue-400">
+                  Ouvert
+                </span>
+              )}
+              {statut === '2' && (
+                <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset dark:bg-emerald-500/10 dark:text-emerald-400">
+                  Signé
+                </span>
+              )}
+              {statut === '3' && (
+                <span className="inline-flex items-center rounded-md bg-red-50 px-2.5 py-1 text-sm font-medium text-red-700 ring-1 ring-red-600/10 ring-inset dark:bg-red-400/10 dark:text-red-400">
+                  Non signé
+                </span>
+              )}
+              {statut === '4' && (
+                <span className="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-sm font-medium text-purple-700 ring-1 ring-purple-700/10 ring-inset dark:bg-purple-400/10 dark:text-purple-400">
+                  Facturé
+                </span>
+              )}
+              <span className="text-muted text-xs">
+                (Le statut se modifie depuis la fiche du devis)
+              </span>
             </div>
           </div>
 
@@ -383,12 +372,6 @@ export default function EditCommercePage() {
             onChange={setLines}
             disabled={!isDraft}
           />
-          {!isDraft && (
-            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-              💡 Les lignes ne sont modifiables que lorsque le devis est en mode{' '}
-              <strong>Brouillon</strong>.
-            </p>
-          )}
         </div>
 
         {/* Actions */}

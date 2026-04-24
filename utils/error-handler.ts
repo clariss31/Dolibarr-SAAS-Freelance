@@ -24,6 +24,11 @@ export function getErrorMessage(error: unknown, context?: string): string {
     return "La quantité de produits dans l'entrepôt de départ n'est pas suffisante et votre configuration n'autorise pas un stock négatif";
   }
 
+  // 1b. Détection des produits désactivés
+  if (rawDataString.includes('erroronelinecontainsadisactivatedproduct')) {
+    return "Action impossible : une des lignes contient un produit qui a été désactivé dans le catalogue.";
+  }
+
   // 2. Détection des messages spécifiques renvoyés par l'API
   if (apiMessage && apiMessage.length < 250) {
     const msg = apiMessage.toLowerCase();

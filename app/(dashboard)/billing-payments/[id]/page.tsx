@@ -6,42 +6,11 @@ import Link from 'next/link';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Invoice, InvoicePayment, ApiError } from '../../../../types/dolibarr';
+import { formatCurrency, formatDate } from '../../../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Formate un montant en euros avec la locale française.
- * Retourne '-' si la valeur est absente ou invalide.
- */
-function formatCurrency(amount: string | number | undefined): string {
-  if (amount === undefined || amount === null || amount === '') return '-';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(Number(amount));
-}
-
-/**
- * Formate un timestamp Dolibarr (secondes Unix ou chaîne ISO) en date lisible `dd/mm/yyyy`.
- * Retourne '-' si la valeur est absente ou invalide.
- */
-function formatDate(timestamp: number | string | undefined): string {
-  if (!timestamp) return '-';
-
-  // Déjà au format ISO (YYYY-MM-DD ou YYYY-MM-DD HH:mm:ss)
-  if (typeof timestamp === 'string' && timestamp.includes('-')) {
-    return new Intl.DateTimeFormat('fr-FR').format(new Date(timestamp));
-  }
-
-  const numTs = Number(timestamp);
-  if (isNaN(numTs)) return '-';
-
-  // Dolibarr retourne des secondes ; on détecte les millisecondes (> 10 chiffres)
-  const ms = numTs < 10_000_000_000 ? numTs * 1000 : numTs;
-  return new Intl.DateTimeFormat('fr-FR').format(new Date(ms));
-}
 
 /**
  * Détermine si une facture est en retard de paiement.

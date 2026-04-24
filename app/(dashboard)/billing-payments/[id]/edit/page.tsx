@@ -8,6 +8,10 @@ import { Invoice, ProposalLine } from '../../../../../types/dolibarr';
 import ProposalLines, {
   LocalLine,
 } from '../../../../../components/ui/ProposalLines';
+import {
+  timestampToDateString,
+  dateStringToTimestamp,
+} from '../../../../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -57,35 +61,7 @@ function apiLineToLocal(line: ProposalLine, index: number): LocalLine {
   };
 }
 
-/**
- * Convertit un timestamp Dolibarr (secondes Unix ou chaîne ISO) en chaîne
- * `YYYY-MM-DD` compatible avec un `<input type="date">`.
- */
-function timestampToDateString(ts: string | number | undefined): string {
-  if (!ts) return '';
 
-  // Déjà au format YYYY-MM-DD ou YYYY-MM-DD HH:mm:ss
-  if (typeof ts === 'string' && ts.includes('-')) return ts.substring(0, 10);
-
-  const numTs = Number(ts);
-  if (isNaN(numTs)) return '';
-
-  // Dolibarr retourne des secondes ; on détecte les millisecondes (> 10 chiffres)
-  const ms = numTs < 10_000_000_000 ? numTs * 1000 : numTs;
-  const date = new Date(ms);
-
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-
-  return `${y}-${m}-${d}`;
-}
-
-/** Convertit une chaîne `YYYY-MM-DD` en timestamp Unix (secondes). */
-function dateStringToTimestamp(dateStr: string): number | null {
-  if (!dateStr) return null;
-  return Math.floor(new Date(dateStr).getTime() / 1000);
-}
 
 // ---------------------------------------------------------------------------
 // Badges de statut
@@ -185,7 +161,10 @@ function EditInvoiceContent({ id }: { id: string }) {
 
         setInvoiceStatut(String(invoice.statut ?? '0'));
         setInvoiceRef(invoice.ref);
-        const deadline = invoice.datelimit || invoice.date_lim_reglement || invoice.date_echeance;
+        const deadline =
+          invoice.datelimit ||
+          invoice.date_lim_reglement ||
+          invoice.date_echeance;
         setFormData({
           date: timestampToDateString(invoice.date),
           datelimit: timestampToDateString(deadline),
@@ -214,19 +193,13 @@ function EditInvoiceContent({ id }: { id: string }) {
           }
         }
 
-        // Résolution du nom du tiers (3 niveaux de repli)
+        // Résolution du nom du tiers
         if (invoice.thirdparty?.name) {
           setClientName(invoice.thirdparty.name);
-        } else if (invoice.soc_name ?? invoice.nom) {
-          setClientName((invoice.soc_name ?? invoice.nom) as string);
         } else if (invoice.socid) {
           try {
             const tierResp = await api.get(`/thirdparties/${invoice.socid}`);
-            setClientName(
-              tierResp.data?.name ??
-                tierResp.data?.nom ??
-                `Tiers ID: ${invoice.socid}`
-            );
+            setClientName(tierResp.data?.name ?? `Tiers ID: ${invoice.socid}`);
           } catch {
             setClientName(`Tiers ID: ${invoice.socid}`);
           }
@@ -313,9 +286,8 @@ function EditInvoiceContent({ id }: { id: string }) {
         : '';
       const isDuplicate =
         rawData.includes('already exists') ||
-        rawData.includes('refsupplieralreadyexists') ||
-        rawData.includes('duplicate') ||
-        (typeParam === 'supplier' && message.includes('Error creating invoice'));
+        (typeParam === 'supplier' &&
+          message.includes('Error creating invoice'));
 
       if (typeParam === 'supplier' && isDuplicate) {
         message = 'La référence facture fournisseur existe déjà';
@@ -461,8 +433,6 @@ function EditInvoiceContent({ id }: { id: string }) {
 
         {/* Lignes de la facture */}
         <ProposalLines lines={lines} onChange={setLines} disabled={!isDraft} />
-
-
 
         {/* Actions */}
         <div className="border-border flex items-center justify-end border-t pt-6">

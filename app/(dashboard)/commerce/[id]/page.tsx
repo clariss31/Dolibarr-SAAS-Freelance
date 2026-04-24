@@ -18,40 +18,15 @@ import { useRouter, useParams, notFound } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Proposal, ProposalLine, ApiError } from '../../../../types/dolibarr';
+import {
+  formatCurrency,
+  formatDate,
+  formatVat,
+} from '../../../../utils/format';
 
 // ---------------------------------------------------------------------------
-// Helpers purs
+// Helpers
 // ---------------------------------------------------------------------------
-
-function formatCurrency(amount: string | number | undefined): string {
-  if (amount === undefined || amount === null || amount === '') return '0,00 €';
-  const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
-  if (isNaN(num)) return '-';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(num);
-}
-
-function formatDate(timestamp: string | number | undefined): string {
-  if (!timestamp) return '-';
-  const ts =
-    typeof timestamp === 'string' ? parseInt(timestamp, 10) : Number(timestamp);
-  if (isNaN(ts) || ts === 0) return '-';
-  // Utiliser les composants locaux pour éviter les sauts de date liés à l'UTC
-  const date = new Date(ts * 1000);
-  return new Intl.DateTimeFormat('fr-FR').format(date);
-}
-
-/**
- * Formate un taux de TVA en supprimant les zéros inutiles à droite (ex: 20,0000 -> 20).
- */
-function formatVat(value: string | number | undefined): string {
-  if (value === undefined || value === null || value === '') return '0%';
-  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
-  if (isNaN(num)) return '-';
-  return new Intl.NumberFormat('fr-FR').format(num) + '%';
-}
 
 /** Badge de statut coloré */
 function ProposalStatusBadge({ status }: { status: string | number }) {
@@ -159,18 +134,18 @@ function CloseProposalModal({ onConfirm, onCancel, loading }: CloseModalProps) {
                     : 'border-border text-foreground hover:border-red-300'
                 }`}
               >
-                ✗ Non signée
+                ❌ Non signée
               </button>
             </div>
           </div>
 
-          {/* Note interne (optionnelle) */}
+          {/* Note */}
           <div>
             <label
               htmlFor="close-note"
               className="text-foreground mb-1 block text-sm font-medium"
             >
-              Note <span className="text-muted font-normal">(optionnelle)</span>
+              Note
             </label>
             <textarea
               id="close-note"
@@ -236,11 +211,9 @@ export default function CommerceDetailsPage() {
       const fetchedProposal = response.data as Proposal;
       setProposal(fetchedProposal);
 
-      // Résolution du nom du tiers (cascade de fallback)
+      // Résolution du nom du tiers
       if (fetchedProposal.thirdparty?.name) {
         setClientName(fetchedProposal.thirdparty.name);
-      } else if (fetchedProposal.soc_name || fetchedProposal.name) {
-        setClientName(fetchedProposal.soc_name || fetchedProposal.name || '');
       } else if (fetchedProposal.socid) {
         try {
           const tierResp = await api.get(

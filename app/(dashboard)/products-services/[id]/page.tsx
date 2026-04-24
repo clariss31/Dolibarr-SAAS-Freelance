@@ -18,29 +18,7 @@ import { useRouter, useParams, notFound } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Product, ApiError } from '../../../../types/dolibarr';
-
-// ---------------------------------------------------------------------------
-// Helpers (Extract outside component for purity and performance)
-// ---------------------------------------------------------------------------
-
-/** Formate un montant en Euros. */
-function formatCurrency(price: string | number | undefined): string {
-  if (price === undefined) return '0,00 €';
-  const num = typeof price === 'string' ? parseFloat(price) : Number(price);
-  if (isNaN(num)) return '0,00 €';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(num);
-}
-
-/** Formate un taux de TVA. */
-function formatPercent(value: string | number | undefined): string {
-  if (value === undefined || value === '') return '—';
-  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
-  if (isNaN(num)) return '—';
-  return `${num} %`;
-}
+import { formatCurrency, formatVat } from '../../../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Composant Principal
@@ -141,7 +119,7 @@ export default function ProductDetailsPage() {
         >
           &larr; Retour au catalogue
         </button>
-        <div 
+        <div
           className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
@@ -273,7 +251,7 @@ export default function ProductDetailsPage() {
                 TVA
               </p>
               <p className="text-foreground text-2xl font-bold">
-                {formatPercent(product.tva_tx)}
+                {formatVat(product.tva_tx)}
               </p>
             </div>
             <div>

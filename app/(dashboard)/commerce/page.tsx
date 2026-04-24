@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '../../../services/api';
 import { getErrorMessage } from '../../../utils/error-handler';
 import { Proposal, ApiError, ThirdParty } from '../../../types/dolibarr';
+import { formatCurrency, formatDate } from '../../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Constantes et Helpers
@@ -24,26 +25,6 @@ import { Proposal, ApiError, ThirdParty } from '../../../types/dolibarr';
 
 const PAGE_LIMIT = 10;
 const SEARCH_DEBOUNCE_MS = 400;
-
-/** Formate un prix en Euros. */
-function formatCurrency(price: string | number | undefined): string {
-  if (price === undefined) return '0,00 €';
-  const num = typeof price === 'string' ? parseFloat(price) : Number(price);
-  if (isNaN(num)) return '-';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(num);
-}
-
-/** Formate un timestamp Dolibarr en date dd/mm/yyyy. */
-function formatDate(timestamp: string | number | undefined): string {
-  if (!timestamp) return '-';
-  const ts =
-    typeof timestamp === 'string' ? parseInt(timestamp, 10) : Number(timestamp);
-  if (isNaN(ts) || ts === 0) return '-';
-  return new Intl.DateTimeFormat('fr-FR').format(new Date(ts * 1000));
-}
 
 // ---------------------------------------------------------------------------
 // Composants de présentation
@@ -176,7 +157,8 @@ export default function CommercePage() {
       if (endDate) conditions.push(`(t.datep:<=:'${endDate} 23:59:59')`);
 
       // Filtre Date Fin Validité (t.fin_validite)
-      if (startDue) conditions.push(`(t.fin_validite:>=:'${startDue} 00:00:00')`);
+      if (startDue)
+        conditions.push(`(t.fin_validite:>=:'${startDue} 00:00:00')`);
       if (endDue) conditions.push(`(t.fin_validite:<=:'${endDue} 23:59:59')`);
 
       if (conditions.length > 0) {
@@ -210,21 +192,33 @@ export default function CommercePage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter, startDate, endDate, startDue, endDue]);
+  }, [
+    page,
+    debouncedSearch,
+    statusFilter,
+    startDate,
+    endDate,
+    startDue,
+    endDue,
+  ]);
 
   /** Calcule le total HT de tous les devis de la période filtrée. */
   const fetchTotals = useCallback(async () => {
     setLoadingTotal(true);
     try {
       const conditions: string[] = [];
-      if (statusFilter !== 'all') conditions.push(`(t.fk_statut:=:${statusFilter})`);
+      if (statusFilter !== 'all')
+        conditions.push(`(t.fk_statut:=:${statusFilter})`);
       if (debouncedSearch) {
         const safe = debouncedSearch.replace(/'/g, "''");
-        conditions.push(`((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`);
+        conditions.push(
+          `((t.ref:like:'%${safe}%') OR (s.nom:like:'%${safe}%'))`
+        );
       }
       if (startDate) conditions.push(`(t.datep:>=:'${startDate} 00:00:00')`);
       if (endDate) conditions.push(`(t.datep:<=:'${endDate} 23:59:59')`);
-      if (startDue) conditions.push(`(t.fin_validite:>=:'${startDue} 00:00:00')`);
+      if (startDue)
+        conditions.push(`(t.fin_validite:>=:'${startDue} 00:00:00')`);
       if (endDue) conditions.push(`(t.fin_validite:<=:'${endDue} 23:59:59')`);
 
       let query = `/proposals?limit=1000`;
@@ -233,7 +227,10 @@ export default function CommercePage() {
       }
       const res = await api.get(query);
       if (Array.isArray(res.data)) {
-        const totalHT = res.data.reduce((acc: number, p: any) => acc + (Number(p.total_ht) || 0), 0);
+        const totalHT = res.data.reduce(
+          (acc: number, p: any) => acc + (Number(p.total_ht) || 0),
+          0
+        );
         setPeriodTotalHT(totalHT);
       } else {
         setPeriodTotalHT(0);
@@ -297,11 +294,14 @@ export default function CommercePage() {
       </div>
 
       {/* Zone Haute : Dates et Totaux */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between w-full">
+      <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between">
         {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
         <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
-          <div className="flex-1 min-w-[120px]">
-            <label htmlFor="date-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
+          <div className="min-w-[120px] flex-1">
+            <label
+              htmlFor="date-start"
+              className="text-muted mb-1 block text-[9px] font-bold tracking-widest text-nowrap uppercase"
+            >
               Proposition Du
             </label>
             <input
@@ -312,8 +312,11 @@ export default function CommercePage() {
               className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
             />
           </div>
-          <div className="flex-1 min-w-[120px]">
-            <label htmlFor="date-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+          <div className="min-w-[120px] flex-1">
+            <label
+              htmlFor="date-end"
+              className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase"
+            >
               au
             </label>
             <input
@@ -324,8 +327,11 @@ export default function CommercePage() {
               className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
             />
           </div>
-          <div className="flex-1 min-w-[120px]">
-            <label htmlFor="due-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase text-nowrap">
+          <div className="min-w-[120px] flex-1">
+            <label
+              htmlFor="due-start"
+              className="text-muted mb-1 block text-[9px] font-bold tracking-widest text-nowrap uppercase"
+            >
               Fin validité Du
             </label>
             <input
@@ -336,8 +342,11 @@ export default function CommercePage() {
               className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
             />
           </div>
-          <div className="flex-1 min-w-[120px]">
-            <label htmlFor="due-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
+          <div className="min-w-[120px] flex-1">
+            <label
+              htmlFor="due-end"
+              className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase"
+            >
               au
             </label>
             <div className="flex items-center gap-1">
@@ -356,11 +365,22 @@ export default function CommercePage() {
                     setStartDue('');
                     setEndDue('');
                   }}
-                  className="text-muted hover:text-red-500 transition-colors"
+                  className="text-muted transition-colors hover:text-red-500"
                   title="Réinitialiser"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               )}
@@ -369,10 +389,12 @@ export default function CommercePage() {
         </div>
 
         {/* Résumé HT */}
-        <div className="bg-primary/5 border-primary/10 flex flex-1 items-center justify-around rounded-xl border px-8 lg:flex-none lg:min-w-[240px]">
+        <div className="bg-primary/5 border-primary/10 flex flex-1 items-center justify-around rounded-xl border px-8 lg:min-w-[240px] lg:flex-none">
           <div className="flex flex-col text-center">
-            <span className="text-muted text-[10px] font-bold tracking-widest uppercase text-nowrap">Total HT (Période)</span>
-            <span className="text-foreground mt-0.5 text-xl font-bold leading-tight">
+            <span className="text-muted text-[10px] font-bold tracking-widest text-nowrap uppercase">
+              Total HT (Période)
+            </span>
+            <span className="text-foreground mt-0.5 text-xl leading-tight font-bold">
               {loadingTotal ? '...' : formatCurrency(periodTotalHT)}
             </span>
           </div>
@@ -382,7 +404,9 @@ export default function CommercePage() {
       {/* Barre de Filtres */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="flex-1">
-          <label htmlFor="search" className="sr-only">Rechercher un devis</label>
+          <label htmlFor="search" className="sr-only">
+            Rechercher un devis
+          </label>
           <input
             id="search"
             type="search"
@@ -393,7 +417,9 @@ export default function CommercePage() {
           />
         </div>
         <div>
-          <label htmlFor="status" className="sr-only">Filtrer par état</label>
+          <label htmlFor="status" className="sr-only">
+            Filtrer par état
+          </label>
           <select
             id="status"
             value={statusFilter}
@@ -411,7 +437,7 @@ export default function CommercePage() {
       </div>
 
       {error && (
-        <div 
+        <div
           className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
