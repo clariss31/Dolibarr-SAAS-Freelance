@@ -85,11 +85,27 @@ export default function CompanySettingsPage() {
             Informations juridiques et fiscales de votre activité freelance.
           </p>
         </div>
-        <div className="max-w-xs rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] text-amber-800 sm:text-xs dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-          <p>
-            <strong>Note :</strong> Ces informations sont en lecture seule. Pour
-            les modifier, veuillez vous rendre dans l'interface d'administration
-            de Dolibarr.
+        <div className="flex max-w-2xl items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3 shadow-sm">
+          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-400 text-slate-900">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </div>
+          <p className="text-[13px] leading-snug text-slate-300">
+            <span className="font-semibold text-slate-100">Note :</span> Ces
+            informations sont en lecture seule. Pour les modifier, utilisez
+            l'administration Dolibarr.
           </p>
         </div>
       </div>
