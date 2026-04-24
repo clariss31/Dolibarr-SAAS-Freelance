@@ -14,6 +14,203 @@ import {
 import StatCard from '../../components/dashboard/StatCard';
 import PeriodFilter, { Period } from '../../components/dashboard/PeriodFilter';
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Détermine si une facture est en retard de paiement.
+ * Supporte les formats Dolibarr (Timestamp secondes ou date YYYY-MM-DD).
+ */
+const isOverdue = (
+  limitStr: string | number | undefined,
+  nowSeconds: number
+) => {
+  if (!limitStr) return false;
+  let parsedTs = 0;
+  if (typeof limitStr === 'string' && limitStr.includes('-')) {
+    // Gère '2026-04-01' ou '2026-04-01 00:00:00'
+    const millis = new Date(limitStr).getTime();
+    if (!isNaN(millis)) {
+      parsedTs = Math.floor(millis / 1000);
+    }
+  } else {
+    parsedTs = Number(limitStr);
+    // Dolibarr retourne des secondes, mais s'il y a plus de 10 chiffres c'est probablement des ms
+    if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
+  }
+  return parsedTs > 0 && parsedTs < nowSeconds;
+};
+
+/**
+ * Formate un timestamp Dolibarr en date courte (JJ/MM/YY).
+ */
+const formatDate = (timestamp: number | string | undefined) => {
+  if (!timestamp) return '-';
+  const numTs = Number(timestamp);
+  if (isNaN(numTs)) return '-';
+  const ms = numTs < 10000000000 ? numTs * 1000 : numTs;
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  }).format(new Date(ms));
+};
+
+/**
+ * Formate un montant en Euros.
+ */
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(amount);
+};
+
+// ---------------------------------------------------------------------------
+// Sous-composants
+// ---------------------------------------------------------------------------
+
+/**
+ * Affiche une liste de 5 éléments récents avec liens et statuts.
+ */
+const RecentList = ({
+  title,
+  items,
+  type,
+  createLink,
+}: {
+  title: string;
+  items: any[];
+  type:
+    | 'thirdparty'
+    | 'product'
+    | 'proposal'
+    | 'client-invoice'
+    | 'supplier-invoice';
+  createLink?: string;
+}) => {
+  const getLink = (item: any) => {
+    switch (type) {
+      case 'thirdparty':
+        return `/third-parties/${item.id}`;
+      case 'product':
+        return `/products-services/${item.id}`;
+      case 'proposal':
+        return `/commerce/${item.id}`;
+      case 'client-invoice':
+        return `/billing-payments/${item.id}?type=client`;
+      case 'supplier-invoice':
+        return `/billing-payments/${item.id}?type=supplier`;
+    }
+  };
+
+  const getStatusColor = (status: string | number) => {
+    const s = String(status);
+    switch (s) {
+      case '1':
+        return 'bg-amber-100 text-amber-700'; // Impayée / Ouvert
+      case '2':
+        return 'bg-emerald-100 text-emerald-700'; // Payée / Signé
+      case '3':
+        return 'bg-red-100 text-red-700'; // Abandonnée / Non signé
+      case '4':
+        return 'bg-purple-100 text-purple-700'; // Facturé
+      case '0':
+      default:
+        return 'bg-gray-100 text-gray-600'; // Brouillon
+    }
+  };
+
+  const isDetailed =
+    type === 'proposal' ||
+    type === 'client-invoice' ||
+    type === 'supplier-invoice';
+
+  return (
+    <div className="bg-surface border-border flex h-full flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
+      <div className="border-border flex items-center justify-between border-b px-5 py-4">
+        <h3 className="text-foreground text-sm font-semibold">{title}</h3>
+        {createLink && (
+          <Link
+            href={createLink}
+            className="btn-primary flex h-6 w-6 items-center justify-center rounded-md p-0 text-sm font-bold"
+            title="Créer nouveau"
+          >
+            +
+          </Link>
+        )}
+      </div>
+      <div className="flex-1 divide-y divide-gray-100 dark:divide-gray-800">
+        {items.length === 0 ? (
+          <p className="text-muted px-5 py-8 text-center text-xs italic">
+            Aucune donnée récente
+          </p>
+        ) : (
+          items.map((item) => (
+            <Link
+              key={item.id}
+              href={getLink(item)}
+              className="group block px-5 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+            >
+              <div className="flex items-center">
+                <div className="min-w-0 flex-1">
+                  {isDetailed ? (
+                    <div className="flex items-center space-x-6">
+                      <span className="text-foreground group-hover:text-primary min-w-[80px] flex-1 truncate text-sm font-medium transition-colors">
+                        {item.ref}
+                      </span>
+                      <div className="flex items-center space-x-8 text-xs whitespace-nowrap">
+                        <span className="text-foreground min-w-[75px] text-right font-semibold">
+                          {formatCurrency(Number(item.total_ht || 0))}
+                        </span>
+                        <span className="text-muted min-w-[65px] text-center">
+                          {formatDate(
+                            item.fin_validite ||
+                              item.datelimit ||
+                              item.date_lim_reglement ||
+                              item.date_echeance ||
+                              item.date
+                          )}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${getStatusColor(
+                            item.statut
+                          )}`}
+                        >
+                          ●
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground group-hover:text-primary truncate text-sm font-medium transition-colors">
+                        {item.name || item.label || item.ref}
+                      </span>
+                      <span className="text-muted text-xs">
+                        {formatDate(item.tms || item.date_creation || item.date)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Composant Principal
+// ---------------------------------------------------------------------------
+
+/**
+ * Page d'accueil du Dashboard.
+ * Calcule les indicateurs financiers (CA, impayés) sur des périodes glissantes
+ * et affiche les activités récentes de tous les modules.
+ */
 export default function DashboardRootPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -304,173 +501,9 @@ export default function DashboardRootPage() {
     fetchDashboardData();
   }, [period]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
-
-  const isOverdue = (
-    limitStr: string | number | undefined,
-    nowSeconds: number
-  ) => {
-    if (!limitStr) return false;
-    let parsedTs = 0;
-    if (typeof limitStr === 'string' && limitStr.includes('-')) {
-      // Handles '2026-04-01' or '2026-04-01 00:00:00'
-      const millis = new Date(limitStr).getTime();
-      if (!isNaN(millis)) {
-        parsedTs = Math.floor(millis / 1000);
-      }
-    } else {
-      parsedTs = Number(limitStr);
-      // Dolibarr returns seconds, but if it has more than 10 digits it might be ms
-      if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
-    }
-    return parsedTs > 0 && parsedTs < nowSeconds;
-  };
-
-  const formatDate = (timestamp: number | string | undefined) => {
-    if (!timestamp) return '-';
-    const numTs = Number(timestamp);
-    if (isNaN(numTs)) return '-';
-    const ms = numTs < 10000000000 ? numTs * 1000 : numTs;
-    // Format Jour/Mois/Année (YY)
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-    }).format(new Date(ms));
-  };
-
-  const RecentList = ({
-    title,
-    items,
-    type,
-    createLink,
-  }: {
-    title: string;
-    items: any[];
-    type:
-      | 'thirdparty'
-      | 'product'
-      | 'proposal'
-      | 'client-invoice'
-      | 'supplier-invoice';
-    createLink?: string;
-  }) => {
-    const getLink = (item: any) => {
-      switch (type) {
-        case 'thirdparty':
-          return `/third-parties/${item.id}`;
-        case 'product':
-          return `/products-services/${item.id}`;
-        case 'proposal':
-          return `/commerce/${item.id}`;
-        case 'client-invoice':
-          return `/billing-payments/${item.id}?type=client`;
-        case 'supplier-invoice':
-          return `/billing-payments/${item.id}?type=supplier`;
-      }
-    };
-
-    const getStatusColor = (status: string | number) => {
-      const s = String(status);
-      switch (s) {
-        case '1':
-          return 'bg-amber-100 text-amber-700'; // Impayée / Ouvert
-        case '2':
-          return 'bg-emerald-100 text-emerald-700'; // Payée / Signé
-        case '3':
-          return 'bg-red-100 text-red-700'; // Abandonnée / Non signé
-        case '4':
-          return 'bg-purple-100 text-purple-700'; // Facturé
-        case '0':
-        default:
-          return 'bg-gray-100 text-gray-600'; // Brouillon
-      }
-    };
-
-    const isDetailed =
-      type === 'proposal' ||
-      type === 'client-invoice' ||
-      type === 'supplier-invoice';
-
-    return (
-      <div className="bg-surface border-border flex h-full flex-col overflow-hidden rounded-xl border shadow-sm">
-        <div className="border-border flex items-center justify-between border-b px-5 py-4">
-          <h3 className="text-foreground text-sm font-semibold">{title}</h3>
-          {createLink && (
-            <Link
-              href={createLink}
-              className="btn-primary flex h-6 w-6 items-center justify-center rounded-md p-0 text-sm font-bold"
-              title="Créer nouveau"
-            >
-              +
-            </Link>
-          )}
-        </div>
-        <div className="flex-1 divide-y divide-gray-100 dark:divide-gray-800">
-          {items.length === 0 ? (
-            <p className="text-muted px-5 py-8 text-center text-xs italic">
-              Aucune donnée récente
-            </p>
-          ) : (
-            items.map((item) => (
-              <Link
-                key={item.id}
-                href={getLink(item)}
-                className="group block px-5 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
-              >
-                <div className="flex items-center">
-                  <div className="min-w-0 flex-1">
-                    {isDetailed ? (
-                      <div className="flex items-center space-x-6">
-                        <span className="text-foreground group-hover:text-primary min-w-[80px] flex-1 truncate text-sm font-medium transition-colors">
-                          {item.ref}
-                        </span>
-                        <div className="flex items-center space-x-8 text-xs whitespace-nowrap">
-                          <span className="text-foreground min-w-[75px] text-right font-semibold">
-                            {formatCurrency(Number(item.total_ht || 0))}
-                          </span>
-                          <span className="text-muted min-w-[65px] text-center">
-                            {formatDate(
-                              item.fin_validite ||
-                                item.datelimit ||
-                                item.date_lim_reglement ||
-                                item.date_echeance ||
-                                item.date
-                            )}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${getStatusColor(
-                              item.statut
-                            )}`}
-                          >
-                            ●
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-foreground group-hover:text-primary truncate text-sm font-medium transition-colors">
-                        {item.name || item.nom || item.label || 'Sans nom'}
-                      </p>
-                    )}
-                  </div>
-                  <div className="ml-4 flex-shrink-0">
-                    <span className="text-muted group-hover:text-primary text-sm transition-colors">
-                      →
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   if (loading) {
     return (

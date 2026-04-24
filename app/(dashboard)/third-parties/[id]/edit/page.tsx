@@ -17,7 +17,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '../../../../../services/api';
 import { getErrorMessage } from '../../../../../utils/error-handler';
-import { ApiError } from '../../../../../types/dolibarr';
 
 // ---------------------------------------------------------------------------
 // Composant Principal
@@ -62,7 +61,6 @@ export default function EditThirdPartyPage() {
       if (response.data) {
         const d = response.data;
 
-        // Déduction du type simplifié pour le formulaire
         let deducedType = 'client';
         if (String(d.fournisseur) === '1') {
           deducedType = 'fournisseur';
@@ -98,20 +96,22 @@ export default function EditThirdPartyPage() {
   }, [fetchTier]);
 
   // --- Pays ---
-  const [countries, setCountries] = useState<{id: string | number, label: string}[]>([
-    { id: '1', label: 'France' }
-  ]);
+  const [countries, setCountries] = useState<
+    { id: string | number; label: string }[]
+  >([{ id: '1', label: 'France' }]);
   const [loadingCountries, setLoadingCountries] = useState(true);
 
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const res = await api.get('/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR');
+        const res = await api.get(
+          '/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR'
+        );
         if (Array.isArray(res.data)) {
           setCountries(res.data.filter((c: any) => String(c.active) === '1'));
         }
       } catch (err) {
-        console.warn('Erreur lors du chargement des pays', err);
+        setError('Impossible de charger la liste des pays.');
       } finally {
         setLoadingCountries(false);
       }
@@ -121,7 +121,6 @@ export default function EditThirdPartyPage() {
 
   // --- Handlers ---
 
-  /** Gère les changements de champs standard */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -129,13 +128,11 @@ export default function EditThirdPartyPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  /** Soumission de la mise à jour */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError('');
 
-    // Mapping du type simplifié vers le schéma Dolibarr (client vs fournisseur)
     const payload: Record<string, unknown> = {
       ...formData,
       client:
@@ -147,7 +144,6 @@ export default function EditThirdPartyPage() {
       fournisseur: formData.t_type === 'fournisseur' ? 1 : 0,
     };
 
-    // On retire la clé temporaire du payload
     delete payload.t_type;
 
     try {
@@ -159,10 +155,9 @@ export default function EditThirdPartyPage() {
     }
   };
 
-  /** Suppression définitive */
   const handleDelete = async () => {
     const message =
-      'Êtes-vous sûr de vouloir supprimer définitivement ce tiers ? Cette action supprimera également ses données associées dans Dolibarr.';
+      'Êtes-vous sûr de vouloir supprimer définitivement ce tiers ?';
     if (!window.confirm(message)) return;
 
     setSaving(true);
@@ -175,13 +170,16 @@ export default function EditThirdPartyPage() {
       setSaving(false);
     }
   };
-
-  // --- Rendu ---
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="text-muted flex items-center justify-center py-20 text-sm italic">
-        Chargement de la fiche complète...
+      <div className="flex items-center justify-center py-20">
+        <p className="text-muted animate-pulse text-sm italic">
+          Chargement de la fiche tiers...
+        </p>
       </div>
     );
   }
@@ -218,17 +216,17 @@ export default function EditThirdPartyPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-[#2d1414] border border-red-900/50 p-4 text-sm text-[#ff6b6b] shadow-lg font-medium animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300">
           {error}
         </div>
       )}
 
-      {/* Formulaire Principal */}
+      {/* Formulaire */}
       <form
         onSubmit={handleSubmit}
         className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
       >
-        {/* Section : Informations de base */}
+        {/* Section : Informations */}
         <section className="border-border border-b pb-6">
           <h2 className="text-foreground text-base font-semibold">
             Informations principales
@@ -256,15 +254,29 @@ export default function EditThirdPartyPage() {
                 htmlFor="dynamic_code"
                 className="text-foreground mb-2 block text-sm font-medium"
               >
-                {formData.t_type === 'fournisseur' ? 'Code fournisseur' : 'Code client'}
+                {formData.t_type === 'fournisseur'
+                  ? 'Code fournisseur'
+                  : 'Code client'}
               </label>
               <input
                 type="text"
                 id="dynamic_code"
-                name={formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client'}
-                value={formData.t_type === 'fournisseur' ? formData.code_fournisseur : formData.code_client}
+                name={
+                  formData.t_type === 'fournisseur'
+                    ? 'code_fournisseur'
+                    : 'code_client'
+                }
+                value={
+                  formData.t_type === 'fournisseur'
+                    ? formData.code_fournisseur
+                    : formData.code_client
+                }
                 onChange={handleChange}
-                placeholder={formData.t_type === 'fournisseur' ? "Ex: SU-001" : "Ex: CUST-001"}
+                placeholder={
+                  formData.t_type === 'fournisseur'
+                    ? 'Ex: SU-001'
+                    : 'Ex: CUST-001'
+                }
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
               />
             </div>
@@ -435,10 +447,10 @@ export default function EditThirdPartyPage() {
           </div>
         </section>
 
-        {/* Section : Legal */}
+        {/* Identifiants légaux */}
         <section className="pb-2">
           <h2 className="text-foreground text-base font-semibold">
-            Identifiants Légaux
+            Identifiants légaux
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>
@@ -476,7 +488,7 @@ export default function EditThirdPartyPage() {
           </div>
         </section>
 
-        {/* Footer : Actions Submit */}
+        {/* Annuler / Enregistrer */}
         <div className="border-border flex items-center justify-end space-x-4 border-t pt-6">
           <button
             type="button"

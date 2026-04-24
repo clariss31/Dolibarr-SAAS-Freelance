@@ -20,24 +20,6 @@ import { getErrorMessage } from '../../../../utils/error-handler';
 import { ApiError } from '../../../../types/dolibarr';
 
 // ---------------------------------------------------------------------------
-// Composant Wrapper (Pour Suspense avec useSearchParams)
-// ---------------------------------------------------------------------------
-
-export default function CreateThirdPartyPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="text-muted flex h-48 animate-pulse items-center justify-center text-sm italic">
-          Chargement du formulaire...
-        </div>
-      }
-    >
-      <CreateThirdPartyForm />
-    </Suspense>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -83,21 +65,27 @@ function CreateThirdPartyForm() {
   const [error, setError] = useState('');
 
   // --- Pays ---
-  const [countries, setCountries] = useState<{id: string | number, label: string}[]>([
-    { id: '1', label: 'France' } // Fallback par défaut
+  const [countries, setCountries] = useState<
+    { id: string | number; label: string }[]
+  >([
+    { id: '1', label: 'France' }, // Fallback par défaut
   ]);
   const [loadingCountries, setLoadingCountries] = useState(true);
 
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const res = await api.get('/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR');
+        const res = await api.get(
+          '/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR'
+        );
         if (Array.isArray(res.data)) {
           setCountries(res.data.filter((c: any) => String(c.active) === '1'));
         }
       } catch (err) {
         // En cas d'erreur API, on garde au moins la France
-        console.warn('Erreur lors du chargement des pays', err);
+        setError(
+          'Impossible de charger la liste des pays. Veuillez vérifier manuellement.'
+        );
       } finally {
         setLoadingCountries(false);
       }
@@ -109,12 +97,18 @@ function CreateThirdPartyForm() {
 
   /** Suggère le prochain code libre en se basant sur le dernier existant */
   const suggestNextCode = useCallback(async (type: string) => {
-    const field = type === 'fournisseur' ? 't.code_fournisseur' : 't.code_client';
+    const field =
+      type === 'fournisseur' ? 't.code_fournisseur' : 't.code_client';
     try {
       // On cherche le dernier code par ordre décroissant
-      const res = await api.get(`/thirdparties?limit=1&sortfield=${field}&sortorder=DESC`);
+      const res = await api.get(
+        `/thirdparties?limit=1&sortfield=${field}&sortorder=DESC`
+      );
       if (Array.isArray(res.data) && res.data.length > 0) {
-        const lastCode = type === 'fournisseur' ? res.data[0].code_fournisseur : res.data[0].code_client;
+        const lastCode =
+          type === 'fournisseur'
+            ? res.data[0].code_fournisseur
+            : res.data[0].code_client;
         if (lastCode && lastCode !== '-1') {
           return incrementCode(lastCode);
         }
@@ -130,9 +124,11 @@ function CreateThirdPartyForm() {
     const fillSuggestion = async () => {
       const suggested = await suggestNextCode(formData.t_type);
       if (suggested) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          [formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client']: suggested
+          [formData.t_type === 'fournisseur'
+            ? 'code_fournisseur'
+            : 'code_client']: suggested,
         }));
       }
     };
@@ -185,19 +181,31 @@ function CreateThirdPartyForm() {
     }
 
     // --- Vérification de l'existence du code ---
-    const targetCode = formData.t_type === 'fournisseur' ? formData.code_fournisseur : formData.code_client;
+    const targetCode =
+      formData.t_type === 'fournisseur'
+        ? formData.code_fournisseur
+        : formData.code_client;
     if (targetCode && targetCode !== '-1') {
       try {
-        const field = formData.t_type === 'fournisseur' ? 't.code_fournisseur' : 't.code_client';
-        const checkRes = await api.get(`/thirdparties?sqlfilters=(${field}:=:'${targetCode}')`);
+        const field =
+          formData.t_type === 'fournisseur'
+            ? 't.code_fournisseur'
+            : 't.code_client';
+        const checkRes = await api.get(
+          `/thirdparties?sqlfilters=(${field}:=:'${targetCode}')`
+        );
         if (Array.isArray(checkRes.data) && checkRes.data.length > 0) {
-          setError("Code client ou fournisseur déjà utilisé, un nouveau code est suggéré");
+          setError(
+            'Code client ou fournisseur déjà utilisé, un nouveau code est suggéré'
+          );
           // Re-suggérer un nouveau code
           const newSuggestion = await suggestNextCode(formData.t_type);
           if (newSuggestion) {
-            setFormData(prev => ({
+            setFormData((prev) => ({
               ...prev,
-              [formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client']: newSuggestion
+              [formData.t_type === 'fournisseur'
+                ? 'code_fournisseur'
+                : 'code_client']: newSuggestion,
             }));
           }
           setSaving(false);
@@ -244,7 +252,7 @@ function CreateThirdPartyForm() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-[#2d1414] border border-red-900/50 p-4 text-sm text-[#ff6b6b] shadow-lg font-medium animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300">
           {error}
         </div>
       )}
@@ -284,13 +292,23 @@ function CreateThirdPartyForm() {
                 htmlFor="dynamic_code"
                 className="text-foreground mb-2 block text-sm font-medium"
               >
-                {formData.t_type === 'fournisseur' ? 'Code fournisseur' : 'Code client'}
+                {formData.t_type === 'fournisseur'
+                  ? 'Code fournisseur'
+                  : 'Code client'}
               </label>
               <input
                 type="text"
                 id="dynamic_code"
-                name={formData.t_type === 'fournisseur' ? 'code_fournisseur' : 'code_client'}
-                value={formData.t_type === 'fournisseur' ? formData.code_fournisseur : formData.code_client}
+                name={
+                  formData.t_type === 'fournisseur'
+                    ? 'code_fournisseur'
+                    : 'code_client'
+                }
+                value={
+                  formData.t_type === 'fournisseur'
+                    ? formData.code_fournisseur
+                    : formData.code_client
+                }
                 onChange={handleChange}
                 placeholder="Laissé vide : généré automatiquement"
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2"
@@ -524,5 +542,30 @@ function CreateThirdPartyForm() {
         </div>
       </form>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Export par défaut (Next.js App Router)
+// ---------------------------------------------------------------------------
+
+/**
+ * Point d'entrée de la route `/third-parties/create`.
+ *
+ * Enveloppe `CreateThirdPartyForm` dans un `<Suspense>` pour satisfaire la
+ * contrainte Next.js App Router : tout composant utilisant `useSearchParams()`
+ * doit être enfant d'un `<Suspense>`, faute de quoi le build échoue.
+ */
+export default function CreateThirdPartyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-muted flex h-48 animate-pulse items-center justify-center text-sm italic">
+          Chargement du formulaire...
+        </div>
+      }
+    >
+      <CreateThirdPartyForm />
+    </Suspense>
   );
 }

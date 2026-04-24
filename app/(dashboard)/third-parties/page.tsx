@@ -19,7 +19,7 @@ import { getErrorMessage } from '../../../utils/error-handler';
 import { ThirdParty, ApiError } from '../../../types/dolibarr';
 
 // ---------------------------------------------------------------------------
-// Helpers (Extract outside component for purity)
+// Helpers
 // ---------------------------------------------------------------------------
 
 /** Détermine l'affichage du type de tiers pour le tableau */
@@ -139,11 +139,13 @@ export default function ThirdPartiesPage() {
     fetchTiers();
   }, [fetchTiers]);
 
-  // --- Rendu ---
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="space-y-6">
-      {/* En-tête de page */}
+      {/* Header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">

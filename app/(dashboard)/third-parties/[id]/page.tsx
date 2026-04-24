@@ -20,7 +20,7 @@ import { getErrorMessage } from '../../../../utils/error-handler';
 import { ThirdParty, ApiError } from '../../../../types/dolibarr';
 
 // ---------------------------------------------------------------------------
-// Helpers (Extract outside component for purity)
+// Helpers
 // ---------------------------------------------------------------------------
 
 /** Détermine le type de tiers sous forme de texte lisible */
@@ -51,17 +51,21 @@ export default function ThirdPartyDetailsPage() {
   const [deleting, setDeleting] = useState(false);
 
   // --- Pays ---
-  const [countries, setCountries] = useState<{id: string | number, label: string}[]>([]);
-  
+  const [countries, setCountries] = useState<
+    { id: string | number; label: string }[]
+  >([]);
+
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const res = await api.get('/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR');
+        const res = await api.get(
+          '/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR'
+        );
         if (Array.isArray(res.data)) {
           setCountries(res.data.filter((c: any) => String(c.active) === '1'));
         }
       } catch (err) {
-        console.warn('Erreur chargement pays:', err);
+        setError('Impossible de charger la liste des pays.');
       }
     };
     fetchCountries();
@@ -114,10 +118,14 @@ export default function ThirdPartyDetailsPage() {
     } catch (err: unknown) {
       const apiErr = err as any;
       let detailMsg = 'Une erreur est survenue lors de la suppression.';
-      
+
       const rawMessage = apiErr.response?.data?.error?.message || '';
-      if (rawMessage.includes('product is probably used') || apiErr.response?.status === 409) {
-        detailMsg = 'Impossible de supprimer ce tiers car il est lié à des documents (factures, devis, etc.).';
+      if (
+        rawMessage.includes('product is probably used') ||
+        apiErr.response?.status === 409
+      ) {
+        detailMsg =
+          'Impossible de supprimer ce tiers car il est lié à des documents (factures, devis, etc.).';
       } else if (rawMessage) {
         detailMsg = rawMessage;
       }
@@ -129,12 +137,16 @@ export default function ThirdPartyDetailsPage() {
     }
   };
 
-  // --- Rendu conditionnel ---
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="text-muted flex items-center justify-center py-20 text-sm italic">
-        Chargement des détails de la fiche...
+      <div className="flex items-center justify-center py-20">
+        <p className="text-muted animate-pulse text-sm italic">
+          Chargement des détails de la fiche...
+        </p>
       </div>
     );
   }
@@ -148,7 +160,7 @@ export default function ThirdPartyDetailsPage() {
         >
           &larr; Retour à la liste
         </button>
-        <div 
+        <div
           className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
@@ -174,7 +186,7 @@ export default function ThirdPartyDetailsPage() {
 
       {/* Alertes d'erreur (ex: échec de suppression) */}
       {error && (
-        <div 
+        <div
           role="alert"
           className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
         >
@@ -320,10 +332,12 @@ export default function ThirdPartyDetailsPage() {
                 Pays
               </p>
               <p className="text-foreground mt-1 text-sm">
-                {tier.country || 
-                 countries.find(c => String(c.id) === String(tier.country_id))?.label || 
-                 tier.country_code || 
-                 '-'}
+                {tier.country ||
+                  countries.find(
+                    (c) => String(c.id) === String(tier.country_id)
+                  )?.label ||
+                  tier.country_code ||
+                  '-'}
               </p>
             </div>
           </div>
@@ -358,7 +372,7 @@ export default function ThirdPartyDetailsPage() {
               </p>
             </div>
             {/* Code Client */}
-            {(String(tier.client) !== '0') && (
+            {String(tier.client) !== '0' && (
               <div>
                 <p className="text-muted text-xs font-medium tracking-wider uppercase">
                   Code client
