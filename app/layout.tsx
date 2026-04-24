@@ -1,23 +1,43 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+// ---------------------------------------------------------------------------
+// Configuration de la typographie (Font Optimization)
+// ---------------------------------------------------------------------------
+
+/**
+ * On utilise Inter comme police par défaut pour un rendu moderne et professionnel.
+ * Next.js optimise automatiquement le chargement pour éviter le "Layout Shift".
+ */
+const inter = Inter({
   subsets: ['latin'],
+  variable: '--font-inter',
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+// ---------------------------------------------------------------------------
+// Métadonnées (SEO & Browser Tab)
+// ---------------------------------------------------------------------------
 
 export const metadata: Metadata = {
-  title: 'Dolibarr SaaS Freelance',
+  title: 'DoliFree SaaS - Dolibarr pour Freelance',
   description:
-    'Advanced ERP/CRM solution for freelancers based on Dolibarr API',
+    'Interface moderne et performante pour gérer votre activité freelance via Dolibarr.',
 };
 
+// ---------------------------------------------------------------------------
+// Layout Racine (Root Layout)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ce fichier est le point d'entrée structurel de TOUTE l'application.
+ * 
+ * Rôles principaux :
+ * 1. Définit les balises <html> et <body> (indispensables).
+ * 2. Injecte les styles globaux (globals.css).
+ * 3. Applique les classes utilitaires globales (ex: dark mode, antialiasing).
+ * 4. Sert de parent à tous les autres layouts (auth, dashboard).
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,9 +46,13 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${inter.variable} h-full antialiased dark`}
+      suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="bg-background min-h-full font-sans text-foreground">
+        {children}
+      </body>
     </html>
   );
 }
+

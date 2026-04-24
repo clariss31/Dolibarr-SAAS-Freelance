@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from 'react';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 export type PeriodType = 'week' | 'month' | 'year' | 'custom';
 
+/**
+ * Définit une période de temps pour le filtrage des données du dashboard.
+ */
 export interface Period {
   type: PeriodType;
   startDate?: Date;
@@ -11,11 +18,22 @@ export interface Period {
 }
 
 interface PeriodFilterProps {
+  /** Période actuellement sélectionnée */
   period: Period;
+  /** Callback déclenché lors du changement de période */
   onChange: (period: Period) => void;
 }
 
+// ---------------------------------------------------------------------------
+// Composant Principal
+// ---------------------------------------------------------------------------
+
+/**
+ * Composant de sélection de période (Dernière semaine, mois, année ou personnalisé).
+ * Gère l'affichage dynamique des champs de date pour le mode 'custom'.
+ */
 export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
+  // --- États Locaux ---
   const [localType, setLocalType] = useState<PeriodType>(period.type);
   const [customStart, setCustomStart] = useState<string>(
     period.startDate ? period.startDate.toISOString().split('T')[0] : ''
@@ -24,6 +42,7 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
     period.endDate ? period.endDate.toISOString().split('T')[0] : ''
   );
 
+  // Synchronisation avec les props externes
   useEffect(() => {
     setLocalType(period.type);
     if (period.type === 'custom') {
@@ -36,14 +55,20 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
     }
   }, [period]);
 
+  // --- Handlers ---
+
+  /**
+   * Gère le changement de type de période prédéfini.
+   */
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = e.target.value as PeriodType;
     setLocalType(newType);
 
     const now = new Date();
     let start: Date | undefined;
-    let end: Date | undefined = now;
+    const end: Date = now;
 
+    // Calcul automatique des dates de début
     if (newType === 'week') {
       start = new Date();
       start.setDate(now.getDate() - 7);
@@ -54,26 +79,33 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
       start = new Date();
       start.setDate(now.getDate() - 365);
     } else if (newType === 'custom') {
-      // Pour custom, on ne déclenche pas onChange tout de suite,
-      // on attend que l'utilisateur remplisse les dates.
+      // En mode personnalisé, on attend que l'utilisateur choisisse ses dates
       return;
     }
 
     onChange({ type: newType, startDate: start, endDate: end });
   };
 
-  const handleCustomDateChange = () => {
-    if (localType === 'custom' && customStart && customEnd) {
+  /**
+   * Déclenche la mise à jour globale si les deux dates personnalisées sont saisies.
+   */
+  const triggerCustomChange = (startStr: string, endStr: string) => {
+    if (localType === 'custom' && startStr && endStr) {
       onChange({
         type: 'custom',
-        startDate: new Date(customStart),
-        endDate: new Date(customEnd),
+        startDate: new Date(startStr),
+        endDate: new Date(endStr),
       });
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
+
   return (
     <div className="bg-surface border-border flex flex-col items-start gap-4 rounded-xl border p-4 shadow-sm sm:flex-row sm:items-center">
+      {/* Sélecteur de type */}
       <div className="flex flex-col">
         <label
           htmlFor="period-select"
@@ -85,7 +117,7 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
           id="period-select"
           value={localType}
           onChange={handleTypeChange}
-          className="bg-background border-input text-foreground focus:ring-primary focus:border-primary rounded-md border px-3 py-2 text-sm"
+          className="bg-background border-input text-foreground focus:ring-primary focus:border-primary rounded-md border px-3 py-2 text-sm transition-all"
         >
           <option value="week">Dernière semaine</option>
           <option value="month">Dernier mois</option>
@@ -94,6 +126,7 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
         </select>
       </div>
 
+      {/* Inputs Date (Mode Personnalisé) */}
       {localType === 'custom' && (
         <div className="mt-2 flex flex-wrap items-end gap-3 sm:mt-0">
           <div className="flex flex-col">
@@ -108,11 +141,10 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
               id="start-date"
               value={customStart}
               onChange={(e) => {
-                setCustomStart(e.target.value);
-                // Déclencher le changement dans un setTimeout pour avoir la valeur la plus récente
-                setTimeout(handleCustomDateChange, 0);
+                const val = e.target.value;
+                setCustomStart(val);
+                triggerCustomChange(val, customEnd);
               }}
-              onBlur={handleCustomDateChange}
               className="bg-background border-input text-foreground focus:ring-primary focus:border-primary max-h-[38px] rounded-md border px-3 py-2 text-sm"
             />
           </div>
@@ -128,10 +160,10 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
               id="end-date"
               value={customEnd}
               onChange={(e) => {
-                setCustomEnd(e.target.value);
-                setTimeout(handleCustomDateChange, 0);
+                const val = e.target.value;
+                setCustomEnd(val);
+                triggerCustomChange(customStart, val);
               }}
-              onBlur={handleCustomDateChange}
               className="bg-background border-input text-foreground focus:ring-primary focus:border-primary max-h-[38px] rounded-md border px-3 py-2 text-sm"
             />
           </div>
@@ -140,3 +172,4 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
     </div>
   );
 }
+
