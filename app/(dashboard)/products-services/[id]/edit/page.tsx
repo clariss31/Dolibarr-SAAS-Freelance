@@ -300,8 +300,8 @@ export default function EditProductPage() {
             <label className="text-foreground mb-3 block text-sm font-medium">
               Libellé & Type *
             </label>
-            <div className="space-y-4">
-              <div className="border-border flex w-full overflow-hidden rounded-md border shadow-sm sm:w-64">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="border-border flex w-full overflow-hidden rounded-md border shadow-sm sm:w-64 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, type: '0' }))}
