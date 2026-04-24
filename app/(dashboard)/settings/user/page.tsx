@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { userService } from '../../../../services/user';
 import { getErrorMessage } from '../../../../utils/error-handler';
@@ -13,21 +12,22 @@ import { User } from '../../../../types/dolibarr';
  * Mise à jour via PUT /users/{id}.
  */
 export default function UserProfilePage() {
-  const router = useRouter();
+  // --- États ---
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Champs du formulaire
+  // --- Champs du formulaire ---
   const [firstname, setFirstname] = useState('');
   const [lastname, setLastname] = useState('');
   const [email, setEmail] = useState('');
   const [job, setJob] = useState('');
-  const [phone, setPhone] = useState('');
 
-  // Chargement du profil au montage
+  // --- Initialisation ---
+
+  /** Charge le profil de l'utilisateur connecté au montage */
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -38,7 +38,6 @@ export default function UserProfilePage() {
           setLastname(data.lastname ?? '');
           setEmail(data.email ?? '');
           setJob(data.job ?? '');
-          setPhone(data.phone ?? '');
         } else {
           setError('Impossible de récupérer le profil utilisateur.');
         }
@@ -51,6 +50,9 @@ export default function UserProfilePage() {
     fetchUser();
   }, []);
 
+  // --- Handlers ---
+
+  /** Soumission des modifications du profil */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id) return;
@@ -65,7 +67,6 @@ export default function UserProfilePage() {
         firstname,
         email,
         job,
-        phone,
       });
       setSuccess('Profil mis à jour avec succès.');
     } catch (err) {
@@ -75,18 +76,23 @@ export default function UserProfilePage() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-muted text-sm">Chargement du profil...</p>
+        <p className="text-muted animate-pulse text-sm italic">
+          Chargement du profil...
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* Header */}
       <div className="border-border flex items-center gap-4 border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
@@ -131,7 +137,7 @@ export default function UserProfilePage() {
             {/* Identifiant (lecture seule) */}
             <div className="sm:col-span-2">
               <label className="text-muted text-xs font-medium tracking-wider uppercase">
-                Identifiant de connexion
+                Identifiant
               </label>
               <p className="text-foreground mt-1 font-mono text-sm">
                 {user?.login ?? '-'}
@@ -192,26 +198,8 @@ export default function UserProfilePage() {
               />
             </div>
 
-            {/* Téléphone */}
-            <div>
-              <label
-                htmlFor="phone"
-                className="text-foreground block text-sm font-medium"
-              >
-                Téléphone
-              </label>
-              <input
-                id="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="bg-background text-foreground ring-border placeholder:text-muted focus:ring-primary mt-1 block w-full rounded-md px-3 py-2 text-sm ring-1 ring-inset focus:ring-2 focus:ring-inset"
-                placeholder="06 12 34 56 78"
-              />
-            </div>
-
             {/* Poste */}
-            <div className="sm:col-span-2">
+            <div>
               <label
                 htmlFor="job"
                 className="text-foreground block text-sm font-medium"
@@ -231,18 +219,11 @@ export default function UserProfilePage() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="text-foreground ring-border hover:bg-background rounded-md px-4 py-2 text-sm font-semibold ring-1 transition-colors ring-inset"
-          >
-            Annuler
-          </button>
+        <div className="flex items-center justify-end">
           <button
             type="submit"
             disabled={saving}
-            className="btn-primary px-4 py-2 disabled:opacity-60"
+            className="btn-primary min-w-[120px] px-6 py-2 shadow-sm disabled:opacity-50"
           >
             {saving ? 'Enregistrement...' : 'Enregistrer'}
           </button>

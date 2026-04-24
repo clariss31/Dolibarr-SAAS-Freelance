@@ -19,6 +19,10 @@ import { getErrorMessage } from '../../../../utils/error-handler';
 import ProposalLines, {
   LocalLine,
 } from '../../../../components/ui/ProposalLines';
+import {
+  dateStringToTimestamp,
+  calculateDaysDiff,
+} from '../../../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Types et Helpers
@@ -26,17 +30,7 @@ import ProposalLines, {
 
 interface ThirdPartyOption {
   id: string;
-  name?: string;
-  nom?: string;
-}
-
-/**
- * Convertit une chaîne YYYY-MM-DD en timestamp Unix (secondes).
- */
-function dateStringToTimestamp(dateStr: string): number | null {
-  if (!dateStr) return null;
-  // Utiliser midi pour éviter les décalages de fuseau horaire (évite le passage au jour précédent)
-  return Math.floor(new Date(dateStr + 'T12:00:00').getTime() / 1000);
+  name: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,11 +101,8 @@ export default function CreateCommercePage() {
     setSaving(true);
     setError('');
 
-    // Calcul de la durée de validité en jours (différence entre les deux dates)
-    const dateStart = new Date(formData.datep + 'T12:00:00');
-    const dateEnd = new Date(formData.fin_validite + 'T12:00:00');
-    const diffTime = dateEnd.getTime() - dateStart.getTime();
-    const dureeValidite = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    // Calcul de la durée de validité en jours
+    const dureeValidite = calculateDaysDiff(formData.datep, formData.fin_validite);
 
     // Construction du payload complet
     const payload = {
@@ -205,7 +196,7 @@ export default function CreateCommercePage() {
               </option>
               {thirdParties.map((tier) => (
                 <option key={tier.id} value={tier.id}>
-                  {tier.name || tier.nom}
+                  {tier.name}
                 </option>
               ))}
             </select>

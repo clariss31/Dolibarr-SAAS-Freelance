@@ -23,6 +23,7 @@ import ProposalLines, {
 import {
   timestampToDateString,
   dateStringToTimestamp,
+  calculateDaysDiff,
 } from '../../../../../utils/format';
 
 // ---------------------------------------------------------------------------
@@ -174,14 +175,8 @@ export default function EditCommercePage() {
     setSaving(true);
     setError('');
 
-    // Calcul de la durée de validité en jours (différence entre les deux dates)
-    const dateStart = new Date(formData.datep + 'T12:00:00');
-    const dateEnd = new Date(formData.fin_validite + 'T12:00:00');
-    const diffTime = dateEnd.getTime() - dateStart.getTime();
-    const dureeValidite = Math.max(
-      0,
-      Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    );
+    // Calcul de la durée de validité en jours
+    const dureeValidite = calculateDaysDiff(formData.datep, formData.fin_validite);
 
     const payload = {
       // On conserve le statut actuel sans le modifier ici (géré via les boutons d'action)

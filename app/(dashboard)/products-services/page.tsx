@@ -122,7 +122,9 @@ export default function ProductsServicesPage() {
     fetchProducts();
   }, [fetchProducts]);
 
-  // --- Rendu ---
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="space-y-6">
@@ -156,7 +158,7 @@ export default function ProductsServicesPage() {
         </div>
       )}
 
-      {/* Onglets (Tabs) */}
+      {/* Onglets */}
       <div className="border-border border-b">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           <button

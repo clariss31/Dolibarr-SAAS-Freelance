@@ -55,6 +55,20 @@ export function dateStringToTimestamp(dateStr: string): number | null {
 }
 
 /**
+ * Calcule le nombre de jours entre deux dates au format YYYY-MM-DD.
+ */
+export function calculateDaysDiff(
+  dateStartStr: string,
+  dateEndStr: string
+): number {
+  if (!dateStartStr || !dateEndStr) return 0;
+  const start = new Date(dateStartStr + 'T12:00:00');
+  const end = new Date(dateEndStr + 'T12:00:00');
+  const diffTime = end.getTime() - start.getTime();
+  return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+}
+
+/**
  * Formate un taux de TVA ou un pourcentage en supprimant les zéros inutiles à droite.
  */
 export function formatVat(value: string | number | undefined): string {

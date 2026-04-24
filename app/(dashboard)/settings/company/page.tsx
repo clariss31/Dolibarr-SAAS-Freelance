@@ -1,29 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Organization } from '../../../../types/dolibarr';
 
 /**
- * Page de consultation de la fiche entreprise (société freelance).
+ * Page de consultation de la fiche entreprise.
  * Lecture via GET /setup/company.
  * Note : La mise à jour n'est pas supportée par l'API REST Dolibarr standard.
  */
 export default function CompanySettingsPage() {
-  const router = useRouter();
+  // --- États ---
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [org, setOrg] = useState<Organization | null>(null);
 
   // --- Pays ---
-  const [countries, setCountries] = useState<{id: string | number, label: string}[]>([]);
-  
+  const [countries, setCountries] = useState<
+    { id: string | number; label: string }[]
+  >([]);
+
+  // --- Initialisation ---
+
+  /** Charge le dictionnaire des pays pour la résolution des labels */
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const res = await api.get('/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR');
+        const res = await api.get(
+          '/setup/dictionary/countries?sortfield=label&sortorder=ASC&lang=fr_FR'
+        );
         if (Array.isArray(res.data)) {
           setCountries(res.data.filter((c: any) => String(c.active) === '1'));
         }
@@ -34,7 +40,7 @@ export default function CompanySettingsPage() {
     fetchCountries();
   }, []);
 
-  // Chargement des infos organisation
+  /** Charge les informations de l'organisation */
   useEffect(() => {
     const fetchOrg = async () => {
       try {
@@ -53,10 +59,14 @@ export default function CompanySettingsPage() {
     fetchOrg();
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Rendu
+  // ---------------------------------------------------------------------------
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-muted text-sm">
+        <p className="text-muted animate-pulse text-sm italic">
           Chargement des informations entreprise...
         </p>
       </div>
@@ -65,7 +75,7 @@ export default function CompanySettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* Header */}
       <div className="border-border flex items-center gap-4 border-b pb-4">
         <div className="flex-1">
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
@@ -75,7 +85,7 @@ export default function CompanySettingsPage() {
             Informations juridiques et fiscales de votre activité freelance.
           </p>
         </div>
-        <div className="max-w-xs rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+        <div className="max-w-xs rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] text-amber-800 sm:text-xs dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
           <p>
             <strong>Note :</strong> Ces informations sont en lecture seule. Pour
             les modifier, veuillez vous rendre dans l'interface d'administration
@@ -115,7 +125,7 @@ export default function CompanySettingsPage() {
           {/* Email */}
           <div>
             <span className="text-muted text-xs font-medium tracking-wider uppercase">
-              E-mail de contact
+              E-mail
             </span>
             <p className="text-foreground mt-1 text-sm">{org?.email || '-'}</p>
           </div>
@@ -184,7 +194,8 @@ export default function CompanySettingsPage() {
               Pays
             </span>
             <p className="text-foreground mt-1 text-sm">
-              {countries.find(c => String(c.id) === String(org?.country_id))?.label || '-'}
+              {countries.find((c) => String(c.id) === String(org?.country_id))
+                ?.label || '-'}
             </p>
           </div>
         </div>

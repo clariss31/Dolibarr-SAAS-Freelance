@@ -20,7 +20,7 @@ import { Proposal, ApiError, ThirdParty } from '../../../types/dolibarr';
 import { formatCurrency, formatDate } from '../../../utils/format';
 
 // ---------------------------------------------------------------------------
-// Constantes et Helpers
+// Constantes
 // ---------------------------------------------------------------------------
 
 const PAGE_LIMIT = 10;
@@ -302,7 +302,7 @@ export default function CommercePage() {
               htmlFor="date-start"
               className="text-muted mb-1 block text-[9px] font-bold tracking-widest text-nowrap uppercase"
             >
-              Proposition Du
+              Proposition du
             </label>
             <input
               id="date-start"
@@ -332,7 +332,7 @@ export default function CommercePage() {
               htmlFor="due-start"
               className="text-muted mb-1 block text-[9px] font-bold tracking-widest text-nowrap uppercase"
             >
-              Fin validité Du
+              Fin validité du
             </label>
             <input
               id="due-start"

@@ -17,25 +17,6 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
-import { Product, ApiError } from '../../../../types/dolibarr';
-
-// ---------------------------------------------------------------------------
-// Composant Wrapper (Pour Suspense avec useSearchParams)
-// ---------------------------------------------------------------------------
-
-export default function CreateProductPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="text-muted flex h-48 animate-pulse items-center justify-center text-sm italic">
-          Chargement du formulaire...
-        </div>
-      }
-    >
-      <CreateProductForm />
-    </Suspense>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Composant Formulaire
@@ -80,9 +61,8 @@ function CreateProductForm() {
         }
       }
     } catch (err) {
-      console.warn(
-        'Erreur lors de la récupération de la config entreprise:',
-        err
+      setError(
+        "Avertissement : Impossible de récupérer la configuration de TVA de votre entreprise. Veuillez vérifier le taux manuellement."
       );
     }
   }, []);
@@ -164,12 +144,12 @@ function CreateProductForm() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-[#2d1414] border border-red-900/50 p-4 text-sm text-[#ff6b6b] shadow-lg font-medium animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300">
           {error}
         </div>
       )}
 
-      {/* Formulaire Utama */}
+      {/* Formulaire */}
       <form
         onSubmit={handleSubmit}
         className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm sm:p-8"
@@ -177,12 +157,15 @@ function CreateProductForm() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {/* Libellé & Type */}
           <div className="sm:col-span-2">
-            <label htmlFor="label" className="text-foreground mb-3 block text-sm font-medium">
+            <label
+              htmlFor="label"
+              className="text-foreground mb-3 block text-sm font-medium"
+            >
               Libellé & Type *
             </label>
             <div className="space-y-4">
-              <div 
-                role="group" 
+              <div
+                role="group"
                 aria-label="Type d'élément"
                 className="border-border flex w-full overflow-hidden rounded-md border shadow-sm sm:w-64"
               >
@@ -360,5 +343,30 @@ function CreateProductForm() {
         </div>
       </form>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Export par défaut (Next.js App Router)
+// ---------------------------------------------------------------------------
+
+/**
+ * Point d'entrée de la route `/products-services/create`.
+ *
+ * Enveloppe `CreateProductForm` dans un `<Suspense>` pour satisfaire la
+ * contrainte Next.js App Router : tout composant utilisant `useSearchParams()`
+ * doit être enfant d'un `<Suspense>`, faute de quoi le build échoue.
+ */
+export default function CreateProductPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="text-muted flex h-48 animate-pulse items-center justify-center text-sm italic">
+          Chargement du formulaire...
+        </div>
+      }
+    >
+      <CreateProductForm />
+    </Suspense>
   );
 }
