@@ -46,8 +46,7 @@ function formatDate(timestamp: number | string | undefined): string {
 /**
  * Détermine si une facture est en retard de paiement.
  * Une facture est en retard si :
- *   - son statut est 1 (impayée)
- *   - sa date d'échéance est antérieure à la date actuelle
+ *   - son statut est 1 (impayée) et sa date d'échéance est antérieure à la date actuelle
  */
 function isOverdue(inv: Invoice): boolean {
   if (Number(inv.statut) !== 1) return false;
@@ -287,26 +286,18 @@ function InvoiceDetailContent({ id }: { id: string }) {
       try {
         const res = await api.get(`${endpoint}/${id}/payments`);
         if (Array.isArray(res.data)) {
-          // Résolution des comptes bancaires via fk_bank_line si fk_bank est absent
-          // Cette logique est nécessaire car Dolibarr ne renvoie pas toujours l'ID du compte directement
           const resolvedPayments = await Promise.all(
             res.data.map(async (p: any) => {
-              // On tente de trouver l'ID du compte dans divers champs possibles
-              let bankId =
-                p.fk_bank ?? p.fk_account ?? p.account_id ?? p.accountid;
+              // On passe par fk_bank_line pour retrouver le compte.
+              let bankId = null;
 
-              if (!bankId && p.fk_bank_line) {
+              if (p.fk_bank_line) {
                 try {
                   const lineRes = await api.get(
                     `/bankaccounts/lines/${p.fk_bank_line}`
                   );
-                  if (
-                    lineRes.data &&
-                    (lineRes.data.fk_account || lineRes.data.fk_bank_account)
-                  ) {
-                    bankId =
-                      lineRes.data.fk_account || lineRes.data.fk_bank_account;
-                  }
+                  bankId =
+                    lineRes.data?.fk_account || lineRes.data?.fk_bank_account;
                 } catch {
                   /* Silencieux */
                 }
@@ -401,21 +392,16 @@ function InvoiceDetailContent({ id }: { id: string }) {
     setError('');
 
     try {
-      // Tentative d'abandon via PUT générique
-      // Note: On envoie plusieurs variantes de champs (statut, id_reason, close_code)
-      // pour assurer la compatibilité avec différentes versions de l'API Dolibarr.
+      // Tentative d'abandon via PUT
       await api.put(`${endpoint}/${id}`, {
-        statut: '3',
         status: '3',
-        id_reason: abandonReason,
         close_code: abandonReason,
         close_note: abandonComment,
-        note_private: abandonComment,
       });
 
       window.location.reload();
     } catch (err: any) {
-      setError(`Échec de l'abandon : ${getErrorMessage(err)}`);
+      setError(getErrorMessage(err));
       setIsSubmittingAbandon(false);
     }
   };
@@ -584,7 +570,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
     );
   }
 
-  if (error || !invoice) {
+  if (!invoice) {
     return (
       <div className="space-y-4">
         <button
@@ -597,7 +583,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
           className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
-          {error || 'Introuvable'}
+          {error || 'Facture introuvable'}
         </div>
       </div>
     );
@@ -612,18 +598,12 @@ function InvoiceDetailContent({ id }: { id: string }) {
 
   // Calcul du mont déjà réglé et du reste à payer à partir des règlements chargés
   // Calcul du montant déjà réglé : on prend le max entre la somme des règlements chargés
-  // et les champs de cumul retournés par Dolibarr (selon les versions et types de factures).
+  // et les champs de cumul retournés par Dolibarr.
   const sommePayeRèglements = payments.reduce(
     (acc, p) => acc + (Number(p.amount) || 0),
     0
   );
-  const sommePayeFacture = Number(
-    invoice.already_payed ??
-      invoice.sumpayed ??
-      (invoice as any).total_paid ??
-      (invoice as any).totalpaid ??
-      0
-  );
+  const sommePayeFacture = Number(invoice.totalpaid ?? 0);
   const sommePaye = Math.max(sommePayeRèglements, sommePayeFacture);
 
   // Si la facture est payée (statut 2), le reste à payer est 0 même si la somme des paiements < total TTC
@@ -659,6 +639,16 @@ function InvoiceDetailContent({ id }: { id: string }) {
         </button>
       </div>
 
+      {/* Affichage des erreurs d'actions (Validation, Abandon, Règlement...) */}
+      {error && (
+        <div
+          className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
+          role="alert"
+        >
+          {error}
+        </div>
+      )}
+
       {/* Header : Titre, Statut et Actions */}
       <div className="border-border border-b py-2 sm:flex sm:items-center sm:justify-between">
         <div className="flex items-center space-x-4">
@@ -669,7 +659,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
         </div>
 
         {/* Actions disponibles selon le statut */}
-        <div className="mt-4 sm:mt-0 sm:flex sm:items-center sm:space-x-4">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3 sm:mt-0 sm:flex-nowrap sm:gap-2">
           {/* Si Brouillon (0) on peut Modifier, Valider, Supprimer */}
           {isDraft && (
             <>
@@ -795,7 +785,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
               </Link>
             </div>
 
-            {/* Référence fournisseur (si présente) */}
+            {/* Référence fournisseur */}
             {invoice.ref_supplier && (
               <div>
                 <p className="text-muted text-xs font-medium tracking-wider uppercase">
@@ -886,22 +876,9 @@ function InvoiceDetailContent({ id }: { id: string }) {
                   </thead>
                   <tbody className="divide-border divide-y">
                     {payments.map((p, idx) => {
-                      // Résolution de la date (Dolibarr utilise datep, datepaye, date ou date_creation)
-                      const pDate =
-                        p.datepaye ??
-                        (p as any).datep ??
-                        (p as any).date ??
-                        (p as any).date_creation;
+                      const pDate = p.date;
 
-                      // Résolution du libellé du mode de paiement
-                      const pMode = String(
-                        p.type ??
-                          p.paiementid ??
-                          p.paiementcode ??
-                          (p as any).type_id ??
-                          (p as any).type_code ??
-                          ''
-                      );
+                      const pMode = String(p.type || '');
                       const modeMapping: Record<string, string> = {
                         '6': 'Carte bancaire',
                         CB: 'Carte bancaire',
@@ -923,40 +900,18 @@ function InvoiceDetailContent({ id }: { id: string }) {
                         (p as any).paiement_type_label ??
                         (p.paiementid ? `Mode #${p.paiementid}` : '-');
 
-                      // Résolution du libellé du compte bancaire (plusieurs noms de champs possibles selon la version Dolibarr)
-                      const pBankId = String(
-                        p.fk_bank ??
-                          (p as any).fk_account ??
-                          (p as any).account_id ??
-                          (p as any).fk_bank_account ??
-                          (p as any).fk_account_bank ??
-                          ''
-                      );
+                      // Résolution du libellé du compte bancaire
+                      const pBankId = String(p.fk_bank || '');
 
                       // Si on n'a toujours pas d'ID de banque sur le règlement, on tente d'utiliser celui par défaut de la facture
-                      const invoiceBankId = String(
-                        invoice.fk_account ??
-                          (invoice as any).fk_bank ??
-                          (invoice as any).account_id ??
-                          ''
-                      );
+                      const invoiceBankId = String(invoice.fk_account || '');
                       const finalBankId = pBankId || invoiceBankId;
 
+                      const bank = bankAccounts.find(
+                        (b) => String(b.id) === finalBankId
+                      );
                       const bankLabel =
-                        bankAccounts.find(
-                          (b) => String(b.id || b.rowid) === finalBankId
-                        )?.label ??
-                        bankAccounts.find(
-                          (b) => String(b.id || b.rowid) === finalBankId
-                        )?.ref ??
-                        (p as any).bank_ref ??
-                        (p as any).account_ref ??
-                        (p as any).bank_label ??
-                        (p as any).account_label ??
-                        p.bank_account ??
-                        (finalBankId && finalBankId !== '0'
-                          ? `Compte #${finalBankId}`
-                          : '-');
+                        bank?.label ?? bank?.ref ?? p.bank_account ?? '-';
 
                       return (
                         <tr
@@ -1073,11 +1028,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                 <tbody className="divide-border bg-surface divide-y">
                   {invoice.lines!.map((line, idx) => {
                     const lineId = line.id ?? line.rowid ?? `line-${idx}`;
-                    const description =
-                      line.label ??
-                      line.description ??
-                      line.product_label ??
-                      '-';
+                    const description = line.description ?? line.label ?? '-';
                     const tva = Number(line.tva_tx) || 0;
                     const puHt = Number(line.subprice) || 0;
                     const remise = Number(line.remise_percent) || 0;
@@ -1157,7 +1108,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                 </h3>
               </div>
 
-              {/* Message d'erreur Dolibarr si incompatibilité sélection Caisse/Mode - seulement après tentative de validation */}
+              {/* Message d'erreur Dolibarr si incompatibilité sélection Caisse/Mode après tentative de validation */}
               {paymentAttempted && showMismatchError && (
                 <div className="mx-6 mt-4 rounded-md border border-red-800/10 bg-red-900/30 p-4 text-sm text-red-400">
                   <p>{mismatchErrorMessage}</p>
@@ -1214,9 +1165,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     htmlFor="payBank"
                     className="text-foreground block text-sm font-medium"
                   >
-                    {typeParam === 'supplier'
-                      ? 'Compte'
-                      : 'Compte bancaire à créditer'}
+                    {typeParam === 'supplier' ? 'Compte' : 'Compte à créditer'}
                   </label>
                   <select
                     id="payBank"
@@ -1251,7 +1200,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                     placeholder="Ex: CHQ123456"
                   />
                 </div>
-                {/* Champs émetteur/banque : masqués pour fournisseurs, toujours affichés pour clients */}
+                {/* Champs émetteur/banque : masqués pour fournisseurs, affichés pour clients */}
                 {typeParam !== 'supplier' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -1402,19 +1351,7 @@ function InvoiceDetailContent({ id }: { id: string }) {
                       : 'Mauvais payeur'}
                   </span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="radio"
-                    name="abandonReason"
-                    value="REPL"
-                    checked={abandonReason === 'REPL'}
-                    onChange={(e) => setAbandonReason(e.target.value)}
-                    className="text-primary focus:ring-primary h-4 w-4 border-gray-300"
-                  />
-                  <span className="text-foreground text-sm">
-                    Remplacement par une autre facture
-                  </span>
-                </label>
+
                 <label className="flex cursor-pointer items-center gap-3">
                   <input
                     type="radio"

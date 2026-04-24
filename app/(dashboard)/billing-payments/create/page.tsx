@@ -22,7 +22,9 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
-import ProposalLines, { LocalLine } from '../../../../components/ui/ProposalLines';
+import ProposalLines, {
+  LocalLine,
+} from '../../../../components/ui/ProposalLines';
 
 // ---------------------------------------------------------------------------
 // Types locaux
@@ -34,9 +36,7 @@ type InvoiceType = 'client' | 'supplier';
 /** Forme minimale d'un tiers retourné par GET /thirdparties. */
 interface ThirdPartyOption {
   id: string;
-  /** Nom retourné selon la version de l'API (name ou nom). */
-  name?: string;
-  nom?: string;
+  name: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ function getDateInDays(days: number): string {
  * Next.js App Router : `useSearchParams()` doit être dans un composant enfant d'un `<Suspense>`.
  */
 function CreateInvoiceForm() {
-  const router       = useRouter();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   /** Type initial lu depuis l'URL (?type=client|supplier), par défaut 'client'. */
@@ -86,8 +86,8 @@ function CreateInvoiceForm() {
 
   // --- État du formulaire ---
   const [formData, setFormData] = useState({
-    socid:     '',
-    date:      getToday(),
+    socid: '',
+    date: getToday(),
     datelimit: getDateInDays(30),
     ref_supplier: '',
   });
@@ -96,12 +96,12 @@ function CreateInvoiceForm() {
   const [lines, setLines] = useState<LocalLine[]>([]);
 
   // --- État des tiers ---
-  const [thirdParties,        setThirdParties]        = useState<ThirdPartyOption[]>([]);
+  const [thirdParties, setThirdParties] = useState<ThirdPartyOption[]>([]);
   const [loadingThirdParties, setLoadingThirdParties] = useState(true);
 
   // --- État UI ---
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState('');
+  const [error, setError] = useState('');
 
   // ---------------------------------------------------------------------------
   // Chargement des tiers
@@ -186,7 +186,8 @@ function CreateInvoiceForm() {
     setError('');
 
     try {
-      const endpoint = invoiceType === 'supplier' ? '/supplierinvoices' : '/invoices';
+      const endpoint =
+        invoiceType === 'supplier' ? '/supplierinvoices' : '/invoices';
 
       if (invoiceType === 'client') {
         // Pour les clients, l'API accepte généralement les lignes dans le POST initial
@@ -207,10 +208,9 @@ function CreateInvoiceForm() {
         const newId = response.data as string | number;
         router.push(`/billing-payments/${newId}?type=client`);
       } else {
-        // Pour les fournisseurs, on crée l'en-tête d'abord, puis les lignes une par une (plus robuste)
         const payload = {
           socid: parseInt(formData.socid, 10),
-          date: formData.date, // Dolibarr v24 attend souvent une chaîne YYYY-MM-DD pour les fournisseurs
+          date: formData.date,
           date_echeance: formData.datelimit,
           ref_supplier: formData.ref_supplier || `SUP-${Date.now()}`,
           ref: 'auto',
@@ -226,7 +226,7 @@ function CreateInvoiceForm() {
             product_type: line.product_type,
             desc: line.label,
             qty: Number(line.qty),
-            pu_ht: Number(line.subprice), // Pour les fournisseurs, l'API utilise souvent pu_ht
+            pu_ht: Number(line.subprice),
             tva_tx: Number(line.tva_tx),
           });
         }
@@ -235,13 +235,14 @@ function CreateInvoiceForm() {
     } catch (err: any) {
       let message = getErrorMessage(err);
 
-      // Détection plus large de la référence en double pour les fournisseurs
-      const rawData = err?.response?.data ? JSON.stringify(err.response.data).toLowerCase() : '';
-      const isDuplicate = 
-        rawData.includes('already exists') || 
-        rawData.includes('refsupplieralreadyexists') || 
-        rawData.includes('duplicate') ||
-        (invoiceType === 'supplier' && message.includes('Error creating invoice'));
+      // Détection de la référence en double pour les fournisseurs
+      const rawData = err?.response?.data
+        ? JSON.stringify(err.response.data).toLowerCase()
+        : '';
+      const isDuplicate =
+        rawData.includes('already exists') ||
+        (invoiceType === 'supplier' &&
+          message.includes('Error creating invoice'));
 
       if (invoiceType === 'supplier' && isDuplicate) {
         message = 'La référence facture fournisseur existe déjà';
@@ -262,7 +263,8 @@ function CreateInvoiceForm() {
       <div className="border-border flex items-center justify-between border-b pb-4">
         <div>
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            Nouvelle facture {invoiceType === 'client' ? 'client' : 'fournisseur'}
+            Nouvelle facture{' '}
+            {invoiceType === 'client' ? 'client' : 'fournisseur'}
           </h1>
           <p className="text-muted mt-1 text-sm">
             Créez une nouvelle facture en brouillon.
@@ -277,26 +279,13 @@ function CreateInvoiceForm() {
         </button>
       </div>
 
-      {/* Message d'erreur (Style Sombre Premium) */}
+      {/* Message d'erreur */}
       {error && (
         <div
-          className="rounded-xl border border-red-800/10 bg-red-900/30 p-4 text-sm text-red-400 shadow-lg backdrop-blur-sm"
+          className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
-          <div className="flex items-center gap-3">
-            <svg
-              className="h-5 w-5 flex-shrink-0"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <p className="font-medium">{error}</p>
-          </div>
+          {error}
         </div>
       )}
 
@@ -306,22 +295,23 @@ function CreateInvoiceForm() {
         className="border-border bg-surface space-y-8 rounded-xl border p-6 shadow-sm transition-shadow hover:shadow-md sm:p-8"
       >
         <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-
           {/* Type de facture & Tiers */}
           <div className="sm:col-span-2">
             <span className="text-foreground block text-sm leading-6 font-medium">
-              Type de facture &amp; Tiers *
+              Type de facture & Tiers *
             </span>
-            <div className="mt-2 space-y-4">
-              {/* Bascule Client / Fournisseur (50/50) */}
-              <fieldset aria-label="Type de facture">
+            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
+              {/* Bascule Client / Fournisseur */}
+              <fieldset aria-label="Type de facture" className="flex-shrink-0">
                 <div className="border-border flex w-full overflow-hidden rounded-md border shadow-sm sm:w-64">
                   <button
                     type="button"
                     onClick={() => setInvoiceType('client')}
                     aria-pressed={invoiceType === 'client'}
                     className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                      invoiceType === 'client' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'
+                      invoiceType === 'client'
+                        ? 'bg-primary text-background'
+                        : 'text-muted hover:bg-muted/10'
                     }`}
                   >
                     Client
@@ -331,18 +321,22 @@ function CreateInvoiceForm() {
                     onClick={() => setInvoiceType('supplier')}
                     aria-pressed={invoiceType === 'supplier'}
                     className={`border-border flex-1 border-l px-4 py-2 text-sm font-medium transition-colors ${
-                      invoiceType === 'supplier' ? 'bg-primary text-background' : 'text-muted hover:bg-muted/10'
+                      invoiceType === 'supplier'
+                        ? 'bg-primary text-background'
+                        : 'text-muted hover:bg-muted/10'
                     }`}
                   >
                     Fournisseur
                   </button>
                 </div>
               </fieldset>
-
-              {/* Select du tiers en dessous */}
+ 
+              {/* Select du tiers */}
               <div className="w-full">
                 <label htmlFor="socid" className="sr-only">
-                  {invoiceType === 'client' ? 'Sélectionner un client' : 'Sélectionner un fournisseur'}
+                  {invoiceType === 'client'
+                    ? 'Sélectionner un client'
+                    : 'Sélectionner un fournisseur'}
                 </label>
                 <select
                   id="socid"
@@ -362,7 +356,7 @@ function CreateInvoiceForm() {
                   </option>
                   {thirdParties.map((tier) => (
                     <option key={tier.id} value={tier.id}>
-                      {tier.name ?? tier.nom}
+                      {tier.name}
                     </option>
                   ))}
                 </select>

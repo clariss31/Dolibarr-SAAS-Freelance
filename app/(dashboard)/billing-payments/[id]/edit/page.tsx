@@ -185,13 +185,10 @@ function EditInvoiceContent({ id }: { id: string }) {
 
         setInvoiceStatut(String(invoice.statut ?? '0'));
         setInvoiceRef(invoice.ref);
+        const deadline = invoice.datelimit || invoice.date_lim_reglement || invoice.date_echeance;
         setFormData({
           date: timestampToDateString(invoice.date),
-          datelimit: timestampToDateString(
-            invoice.datelimit ??
-              invoice.date_lim_reglement ??
-              invoice.date_echeance
-          ),
+          datelimit: timestampToDateString(deadline),
         });
 
         // Chargement des lignes : payload d'abord, repli endpoint dédié ensuite
@@ -287,9 +284,7 @@ function EditInvoiceContent({ id }: { id: string }) {
           try {
             await api.delete(`${endpoint}/${id}/lines/${lineId}`);
           } catch {
-            console.warn(
-              `Ligne ${lineId} impossible à supprimer, on continue.`
-            );
+            // On ignore silencieusement si une ligne ne peut être supprimée
           }
         }
 
@@ -467,13 +462,7 @@ function EditInvoiceContent({ id }: { id: string }) {
         {/* Lignes de la facture */}
         <ProposalLines lines={lines} onChange={setLines} disabled={!isDraft} />
 
-        {/* Avertissement si la facture n'est pas en brouillon */}
-        {!isDraft && (
-          <p className="text-muted -mt-2 text-xs">
-            Les lignes ne peuvent être modifiées que sur une facture en statut{' '}
-            <strong>Brouillon</strong>.
-          </p>
-        )}
+
 
         {/* Actions */}
         <div className="border-border flex items-center justify-end border-t pt-6">

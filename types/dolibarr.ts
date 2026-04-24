@@ -89,7 +89,8 @@ export interface Proposal {
 export interface InvoicePayment {
   id: string | number;
   ref?: string;
-  datepaye: number | string;
+  date?: number | string;
+  datepaye?: number | string;
   paiementid?: string | number;      // ID du mode de paiement
   paiementcode?: string;             // Code du mode (ex: CB, CHQ, LIQ...)
   type?: string;                     // Autre champ pour le code du mode

@@ -58,7 +58,7 @@ function toDoliDate(dateStr: string): string {
 type InvoiceTab = 'client' | 'supplier';
 
 // ---------------------------------------------------------------------------
-// Helpers purs
+// Helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -140,15 +140,7 @@ function StatusBadge({ invoice }: { invoice: Invoice }) {
           ? Number(invAny.remaintopay)
           : undefined;
 
-      let sommePaye = Number(
-        invAny.already_payed ??
-          invAny.sumpayed ??
-          invAny.total_paid ??
-          invAny.totalpaid ??
-          invAny.paid ??
-          invAny.total_paye ??
-          0
-      );
+      let sommePaye = Number(invAny.totalpaid || 0);
 
       // Fallback puissant : si remaintopay est présent et cohérent, on en déduit le payé
       if (
@@ -300,7 +292,7 @@ function BillingPaymentsContent() {
             soc_name?: string;
           }>
         ).forEach((t) => {
-          dict[String(t.id)] = t.name ?? t.nom ?? t.soc_name ?? '';
+          dict[String(t.id)] = t.name ?? '';
         });
 
         setThirdPartiesMap(dict);
@@ -416,13 +408,7 @@ function BillingPaymentsContent() {
         let finalInvoices = response.data;
         if (Array.isArray(finalInvoices)) {
           const getSommePaye = (inv: any) =>
-            Number(
-              inv.already_payed ??
-                inv.sumpayed ??
-                inv.total_paid ??
-                inv.totalpaid ??
-                0
-            );
+            Number(inv.totalpaid || 0);
 
           if (statusFilter === 'part') {
             finalInvoices = finalInvoices.filter((inv) => {
@@ -626,90 +612,102 @@ function BillingPaymentsContent() {
         </nav>
       </div>
 
+      {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
+      <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between">
         {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
-        <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between">
-          {/* Sélecteurs de date (compact, horizontal, fond ombré) */}
-          <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
+        <div className="bg-primary/5 border-primary/10 flex flex-[2] flex-wrap items-center gap-6 rounded-xl border p-3 lg:flex-nowrap">
+          <div className="min-w-[120px] flex-1">
+            <label
+              htmlFor="date-start"
+              className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase"
+            >
+              Facturation Du
+            </label>
+            <input
+              id="date-start"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          <div className="min-w-[120px] flex-1">
+            <label
+              htmlFor="date-end"
+              className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase"
+            >
+              au
+            </label>
+            <input
+              id="date-end"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
+            />
+          </div>
+          {activeTab === 'client' && (
             <div className="min-w-[120px] flex-1">
-              <label htmlFor="date-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-                Facturation Du
+              <label
+                htmlFor="due-start"
+                className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase"
+              >
+                Échéance Du
               </label>
               <input
-                id="date-start"
+                id="due-start"
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                value={startDue}
+                onChange={(e) => setStartDue(e.target.value)}
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
               />
             </div>
-            <div className="min-w-[120px] flex-1">
-              <label htmlFor="date-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-                au
-              </label>
+          )}
+          <div className="min-w-[120px] flex-1">
+            <label
+              htmlFor="due-end"
+              className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase"
+            >
+              {activeTab === 'client' ? 'au' : 'Échéance avant le'}
+            </label>
+            <div className="flex items-center gap-1">
               <input
-                id="date-end"
+                id="due-end"
                 type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                value={endDue}
+                onChange={(e) => setEndDue(e.target.value)}
                 className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
               />
-            </div>
-            {activeTab === 'client' && (
-              <div className="min-w-[120px] flex-1">
-                <label htmlFor="due-start" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-                  Échéance Du
-                </label>
-                <input
-                  id="due-start"
-                  type="date"
-                  value={startDue}
-                  onChange={(e) => setStartDue(e.target.value)}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
-                />
-              </div>
-            )}
-            <div className="min-w-[120px] flex-1">
-              <label htmlFor="due-end" className="text-muted mb-1 block text-[9px] font-bold tracking-widest uppercase">
-                {activeTab === 'client' ? 'au' : 'Échéance avant le'}
-              </label>
-              <div className="flex items-center gap-1">
-                <input
-                  id="due-end"
-                  type="date"
-                  value={endDue}
-                  onChange={(e) => setEndDue(e.target.value)}
-                  className="bg-background text-foreground ring-border focus:ring-primary block w-full rounded-md px-2 py-1.5 text-xs ring-1 ring-inset focus:ring-2"
-                />
-                {(startDate || endDate || startDue || endDue) && (
-                  <button
-                    onClick={() => {
-                      setStartDate('');
-                      setEndDate('');
-                      setStartDue('');
-                      setEndDue('');
-                    }}
-                    className="text-muted transition-colors hover:text-red-500"
-                    title="Réinitialiser"
+              {(startDate || endDate || startDue || endDue) && (
+                <button
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setStartDue('');
+                    setEndDue('');
+                  }}
+                  className="text-muted transition-colors hover:text-red-500"
+                  title="Réinitialiser"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
                   >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                )}
-              </div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
+        </div>
 
         {/* Résumé des totaux de la période */}
         <div className="bg-primary/5 border-primary/10 flex flex-1 items-center justify-around gap-4 rounded-xl border px-6 lg:min-w-[320px] lg:flex-none">
