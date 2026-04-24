@@ -845,7 +845,22 @@ function InvoiceDetailContent({ id }: { id: string }) {
                   </thead>
                   <tbody className="divide-border divide-y">
                     {payments.map((p, idx) => {
-                      const pDate = p.date;
+                      // Résolution ultra-robuste de la date (Dolibarr est très inconsistant selon les versions/endpoints)
+                      const rawDate =
+                        p.date ??
+                        p.datepaye ??
+                        (p as any).datep ??
+                        (p as any).date_paiement ??
+                        (p as any).datec ??
+                        (p as any).tms;
+
+                      // Si Dolibarr renvoie un objet date { timestamp, ... } au lieu d'une valeur directe
+                      const pDate =
+                        rawDate && typeof rawDate === 'object'
+                          ? (rawDate as any).timestamp ??
+                            (rawDate as any).date ??
+                            rawDate
+                          : rawDate;
 
                       const pMode = String(p.type || '');
                       const modeMapping: Record<string, string> = {

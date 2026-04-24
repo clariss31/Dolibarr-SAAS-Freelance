@@ -13,13 +13,23 @@ export function formatCurrency(amount: string | number | undefined): string {
  * Formate un timestamp Dolibarr (secondes) en date lisible (DD/MM/YYYY).
  */
 export function formatDate(timestamp: number | string | undefined): string {
-  if (!timestamp) return '-';
-  const numTs = Number(timestamp);
-  if (isNaN(numTs)) return '-';
+  if (!timestamp || timestamp === '0' || timestamp === 0) return '-';
 
-  // Détection : Dolibarr = secondes (< 10^10), JS = millisecondes
-  const ms = numTs < 10000000000 ? numTs * 1000 : numTs;
-  const date = new Date(ms);
+  let date: Date;
+
+  // Cas 1 : C'est un nombre (timestamp secondes ou ms) ou une chaîne purement numérique
+  const numTs = Number(timestamp);
+  if (!isNaN(numTs)) {
+    // Détection : Dolibarr = secondes (< 10^10), JS = millisecondes
+    const ms = numTs < 10000000000 ? numTs * 1000 : numTs;
+    date = new Date(ms);
+  } else {
+    // Cas 2 : C'est une chaîne de caractères date (ex: "2024-04-24" ou ISO)
+    date = new Date(timestamp as string);
+  }
+
+  // Vérification de la validité de la date générée
+  if (isNaN(date.getTime())) return '-';
 
   return new Intl.DateTimeFormat('fr-FR', {
     day: '2-digit',
