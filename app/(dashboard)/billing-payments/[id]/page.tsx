@@ -6,37 +6,11 @@ import Link from 'next/link';
 import { api } from '../../../../services/api';
 import { getErrorMessage } from '../../../../utils/error-handler';
 import { Invoice, InvoicePayment, ApiError } from '../../../../types/dolibarr';
-import { formatCurrency, formatDate } from '../../../../utils/format';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Détermine si une facture est en retard de paiement.
- * Une facture est en retard si :
- *   - son statut est 1 (impayée) et sa date d'échéance est antérieure à la date actuelle
- */
-function isOverdue(inv: Invoice): boolean {
-  if (Number(inv.statut) !== 1) return false;
-
-  const limitRaw = inv.datelimit ?? inv.date_lim_reglement ?? inv.date_echeance;
-  if (!limitRaw) return false;
-
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  let limitSeconds = 0;
-
-  if (typeof limitRaw === 'string' && limitRaw.includes('-')) {
-    const ms = new Date(limitRaw).getTime();
-    if (!isNaN(ms)) limitSeconds = Math.floor(ms / 1000);
-  } else {
-    const raw = Number(limitRaw);
-    // Normalisation : passage en secondes si retourné en millisecondes
-    limitSeconds = raw > 10_000_000_000 ? Math.floor(raw / 1000) : raw;
-  }
-
-  return limitSeconds > 0 && limitSeconds < nowSeconds;
-}
+import {
+  formatCurrency,
+  formatDate,
+  isOverdue,
+} from '../../../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Badges de statut
@@ -590,9 +564,11 @@ function InvoiceDetailContent({ id }: { id: string }) {
   const mismatchErrorMessage =
     "Ce compte bancaire est de type caisse et n'accepte que le mode de règlement de type espèce.";
 
-  // Date d'échéance (plusieurs noms de champ selon la version Dolibarr)
   const dueDateRaw =
     invoice.datelimit ?? invoice.date_lim_reglement ?? invoice.date_echeance;
+
+  const invoiceIsOverdue =
+    Number(invoice.statut) === 1 && isOverdue(dueDateRaw);
 
   const hasLines = (invoice.lines?.length ?? 0) > 0;
 
@@ -783,11 +759,11 @@ function InvoiceDetailContent({ id }: { id: string }) {
               </p>
               <div className="mt-1 flex items-center gap-2">
                 <p
-                  className={`text-sm font-medium ${isOverdue(invoice) ? 'font-bold text-red-600 dark:text-red-400' : 'text-foreground'}`}
+                  className={`text-sm font-medium ${invoiceIsOverdue ? 'font-bold text-red-600 dark:text-red-400' : 'text-foreground'}`}
                 >
                   {formatDate(dueDateRaw)}
                 </p>
-                {isOverdue(invoice) && (
+                {invoiceIsOverdue && (
                   <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
                     RETARD
                   </span>
@@ -857,9 +833,9 @@ function InvoiceDetailContent({ id }: { id: string }) {
                       // Si Dolibarr renvoie un objet date { timestamp, ... } au lieu d'une valeur directe
                       const pDate =
                         rawDate && typeof rawDate === 'object'
-                          ? (rawDate as any).timestamp ??
+                          ? ((rawDate as any).timestamp ??
                             (rawDate as any).date ??
-                            rawDate
+                            rawDate)
                           : rawDate;
 
                       const pMode = String(p.type || '');

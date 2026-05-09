@@ -94,7 +94,7 @@ export function formatVat(value: string | number | undefined): string {
  */
 export function isOverdue(
   limitStr: string | number | undefined,
-  nowSeconds: number
+  nowSeconds: number = Math.floor(Date.now() / 1000)
 ): boolean {
   if (!limitStr) return false;
   let parsedTs = 0;
