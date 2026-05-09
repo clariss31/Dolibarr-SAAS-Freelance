@@ -126,7 +126,7 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
         </select>
       </div>
 
-      {/* Inputs Date (Mode Personnalisé) */}
+      {/* Champs de date (mode personnalisé) */}
       {localType === 'custom' && (
         <div className="mt-2 flex flex-wrap items-end gap-3 sm:mt-0">
           <div className="flex flex-col">
@@ -172,4 +172,3 @@ export default function PeriodFilter({ period, onChange }: PeriodFilterProps) {
     </div>
   );
 }
-

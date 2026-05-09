@@ -540,7 +540,7 @@ export default function CommercePage() {
           </table>
         </div>
 
-        {/* Pagination Style Facturation */}
+        {/* Pagination */}
         <div className="border-border bg-surface flex items-center justify-between border-t px-4 py-3 sm:px-6">
           {/* Desktop Version */}
           <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">

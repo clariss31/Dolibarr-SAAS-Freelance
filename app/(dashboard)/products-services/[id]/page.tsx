@@ -131,7 +131,7 @@ export default function ProductDetailsPage() {
 
   const isService = String(product.type) === '1';
 
-  // --- Rendu Principal ---
+  // --- Rendu ---
 
   return (
     <div className="space-y-6">

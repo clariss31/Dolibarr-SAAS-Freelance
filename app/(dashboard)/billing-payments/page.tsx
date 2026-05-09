@@ -46,11 +46,6 @@ function shiftDate(dateStr: string, days: number): string {
   return `${y}${m}${dd}`;
 }
 
-/** Convertit une date YYYY-MM-DD en format YYYYMMDD sans décalage. */
-function toDoliDate(dateStr: string): string {
-  return dateStr.replace(/-/g, '');
-}
-
 // ---------------------------------------------------------------------------
 // Types locaux
 // ---------------------------------------------------------------------------

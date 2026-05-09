@@ -2,9 +2,9 @@
 
 /**
  * @file components/ui/ProfileMenu.tsx
- * 
+ *
  * Composant de menu utilisateur situé dans la barre de navigation.
- * 
+ *
  * Gère l'affichage de l'avatar (initiales), les liens vers les réglages profil/entreprise
  * et la procédure de déconnexion globale.
  */
@@ -21,7 +21,15 @@ import { User } from '../../types/dolibarr';
 
 function UserCircleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
     </svg>
@@ -30,7 +38,15 @@ function UserCircleIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
       <rect x="2" y="7" width="20" height="14" rx="2" />
       <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
       <line x1="12" y1="12" x2="12" y2="17" />
@@ -41,7 +57,15 @@ function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function LogOutIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
@@ -59,7 +83,7 @@ export default function ProfileMenu() {
 
   // --- États ---
   const [isOpen, setIsOpen] = useState(false);
-  const [user,   setUser]   = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // --- Effets ---
 
@@ -118,7 +142,7 @@ export default function ProfileMenu() {
    */
   const handleLogout = () => {
     setIsOpen(false);
-    userService.logout(); // Appelle en cascade auth.logout()
+    userService.logout();
     router.push('/login');
   };
 
@@ -170,7 +194,10 @@ export default function ProfileMenu() {
               onClick={() => setIsOpen(false)}
               className="text-foreground hover:bg-background flex items-center gap-3 px-4 py-2 text-sm transition-colors"
             >
-              <UserCircleIcon className="text-muted h-4 w-4 shrink-0" aria-hidden="true" />
+              <UserCircleIcon
+                className="text-muted h-4 w-4 shrink-0"
+                aria-hidden="true"
+              />
               Profil
             </Link>
 
@@ -181,7 +208,10 @@ export default function ProfileMenu() {
               onClick={() => setIsOpen(false)}
               className="text-foreground hover:bg-background flex items-center gap-3 px-4 py-2 text-sm transition-colors"
             >
-              <BuildingIcon className="text-muted h-4 w-4 shrink-0" aria-hidden="true" />
+              <BuildingIcon
+                className="text-muted h-4 w-4 shrink-0"
+                aria-hidden="true"
+              />
               Entreprise
             </Link>
           </div>

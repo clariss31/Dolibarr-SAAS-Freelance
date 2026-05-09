@@ -13,59 +13,7 @@ import {
 } from '../../types/dolibarr';
 import StatCard from '../../components/dashboard/StatCard';
 import PeriodFilter, { Period } from '../../components/dashboard/PeriodFilter';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Détermine si une facture est en retard de paiement.
- * Supporte les formats Dolibarr (Timestamp secondes ou date YYYY-MM-DD).
- */
-const isOverdue = (
-  limitStr: string | number | undefined,
-  nowSeconds: number
-) => {
-  if (!limitStr) return false;
-  let parsedTs = 0;
-  if (typeof limitStr === 'string' && limitStr.includes('-')) {
-    // Gère '2026-04-01' ou '2026-04-01 00:00:00'
-    const millis = new Date(limitStr).getTime();
-    if (!isNaN(millis)) {
-      parsedTs = Math.floor(millis / 1000);
-    }
-  } else {
-    parsedTs = Number(limitStr);
-    // Dolibarr retourne des secondes, mais s'il y a plus de 10 chiffres c'est probablement des ms
-    if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
-  }
-  return parsedTs > 0 && parsedTs < nowSeconds;
-};
-
-/**
- * Formate un timestamp Dolibarr en date courte (JJ/MM/YY).
- */
-const formatDate = (timestamp: number | string | undefined) => {
-  if (!timestamp) return '-';
-  const numTs = Number(timestamp);
-  if (isNaN(numTs)) return '-';
-  const ms = numTs < 10000000000 ? numTs * 1000 : numTs;
-  return new Intl.DateTimeFormat('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-  }).format(new Date(ms));
-};
-
-/**
- * Formate un montant en Euros.
- */
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(amount);
-};
+import { formatDate, formatCurrency, isOverdue } from '../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Sous-composants
@@ -188,7 +136,9 @@ const RecentList = ({
                         {item.name || item.label || item.ref}
                       </span>
                       <span className="text-muted text-xs">
-                        {formatDate(item.tms || item.date_creation || item.date)}
+                        {formatDate(
+                          item.tms || item.date_creation || item.date
+                        )}
                       </span>
                     </div>
                   )}
@@ -215,13 +165,13 @@ export default function DashboardRootPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Period State
+  // État de la période
   const [period, setPeriod] = useState<Period>({ type: 'month' });
 
-  // Company State
+  // État de la TVA
   const [isTvaAssuj, setIsTvaAssuj] = useState(true);
 
-  // KPI States
+  // États des KPI
   const [stats, setStats] = useState({
     caHT: 0,
     caHTPrevious: 0,
@@ -240,7 +190,7 @@ export default function DashboardRootPage() {
     upcomingSupplierOverdueHT: 0,
   });
 
-  // Recent Activity States
+  // États des activités récentes
   const [recentThirdParties, setRecentThirdParties] = useState<ThirdParty[]>(
     []
   );
@@ -460,7 +410,7 @@ export default function DashboardRootPage() {
 
         setStats(newStats);
 
-        // Process Lists
+        // Traitement des listes
         if (thirdPartiesRes.status === 'fulfilled')
           setRecentThirdParties(thirdPartiesRes.value.data || []);
         if (productsRes.status === 'fulfilled')
@@ -479,7 +429,7 @@ export default function DashboardRootPage() {
           setIsTvaAssuj(String(org.tva_assuj) === '1');
         }
 
-        // If many critical requests failed, show a warning
+        // Si de nombreuses requêtes critiques ont échoué, afficher un avertissement
         const failures = [
           invoicesKpiRes,
           proposalsKpiRes,
@@ -551,7 +501,7 @@ export default function DashboardRootPage() {
       </div>
 
       {error && (
-        <div 
+        <div
           className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-red-900/50 bg-[#2d1414] p-4 text-sm font-medium text-[#ff6b6b] shadow-lg duration-300"
           role="alert"
         >
@@ -559,7 +509,7 @@ export default function DashboardRootPage() {
         </div>
       )}
 
-      {/* KPI Section */}
+      {/* KPI */}
       {(() => {
         let caTrend;
         if (stats.caHTPrevious > 0) {
@@ -640,7 +590,7 @@ export default function DashboardRootPage() {
         );
       })()}
 
-      {/* Recent Activity Section */}
+      {/* Activités récentes */}
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <RecentList

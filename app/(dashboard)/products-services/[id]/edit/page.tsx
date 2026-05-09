@@ -20,7 +20,7 @@ import { getErrorMessage } from '../../../../../utils/error-handler';
 import { Product, ApiError } from '../../../../../types/dolibarr';
 
 // ---------------------------------------------------------------------------
-// Helpers (Extract outside component for purity and performance)
+// Helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -217,8 +217,6 @@ export default function EditProductPage() {
         multiprices_tx: { '1': tvaRate },
       };
 
-      console.log('Submitting payload with multiprice support:', payload);
-
       await api.put(`/products/${id}`, payload);
       router.push(`/products-services/${id}`); // Retour au détail
     } catch (err: unknown) {
@@ -301,7 +299,7 @@ export default function EditProductPage() {
               Libellé & Type *
             </label>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="border-border flex w-full overflow-hidden rounded-md border shadow-sm sm:w-64 flex-shrink-0">
+              <div className="border-border flex w-full flex-shrink-0 overflow-hidden rounded-md border shadow-sm sm:w-64">
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, type: '0' }))}

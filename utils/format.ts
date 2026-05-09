@@ -87,3 +87,28 @@ export function formatVat(value: string | number | undefined): string {
   if (isNaN(num)) return '-';
   return new Intl.NumberFormat('fr-FR').format(num) + ' %';
 }
+
+/**
+ * Détermine si une facture est en retard de paiement.
+ * Supporte les formats Dolibarr (Timestamp secondes ou date YYYY-MM-DD).
+ */
+export function isOverdue(
+  limitStr: string | number | undefined,
+  nowSeconds: number
+): boolean {
+  if (!limitStr) return false;
+  let parsedTs = 0;
+  if (typeof limitStr === 'string' && limitStr.includes('-')) {
+    // Gère '2026-04-01' ou '2026-04-01 00:00:00'
+    const millis = new Date(limitStr).getTime();
+    if (!isNaN(millis)) {
+      parsedTs = Math.floor(millis / 1000);
+    }
+  } else {
+    parsedTs = Number(limitStr);
+    // Dolibarr retourne des secondes, mais s'il y a plus de 10 chiffres c'est probablement des ms
+    if (parsedTs > 10000000000) parsedTs = Math.floor(parsedTs / 1000);
+  }
+  return parsedTs > 0 && parsedTs < nowSeconds;
+}
+

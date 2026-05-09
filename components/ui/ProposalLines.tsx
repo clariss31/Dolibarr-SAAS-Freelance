@@ -3,6 +3,7 @@
 import { useState, useEffect, useId } from 'react';
 import { api } from '../../services/api';
 import { Product } from '../../types/dolibarr';
+import { formatCurrency } from '../../utils/format';
 
 /**
  * Représentation locale d'une ligne de devis.
@@ -37,16 +38,6 @@ function computeTotals(lines: LocalLine[]) {
   );
   const totalTTC = lines.reduce((sum, l) => sum + l.total_ttc, 0);
   return { totalHT, totalTVA, totalTTC };
-}
-
-/** Formate un nombre en euros avec 2 décimales */
-function formatEur(value: number): string {
-  return (
-    value.toLocaleString('fr-FR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }) + ' €'
-  );
 }
 
 /** Génère une clé locale unique */
@@ -193,7 +184,7 @@ export default function ProposalLines({
       {/* Sélecteur d'ajout de ligne */}
       {!disabled && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          {/* Produit / Service (Custom Searchable Dropdown) */}
+          {/* Produit / Service (Menu déroulant de recherche personnalisé) */}
           <div className="relative flex-[3]">
             <label className="text-foreground mb-1 block text-sm font-medium">
               Produit / Service
@@ -272,7 +263,7 @@ export default function ProposalLines({
                                 {p.ref} - {p.label}
                               </span>
                               <span className="text-muted text-xs">
-                                {formatEur(Number(p.price) || 0)} HT
+                                {formatCurrency(Number(p.price) || 0)} HT
                               </span>
                             </div>
                           </div>
@@ -373,7 +364,7 @@ export default function ProposalLines({
                 >
                   <td className="text-foreground px-4 py-3">{line.label}</td>
                   <td className="text-foreground px-4 py-3 text-right">
-                    {formatEur(line.subprice)}
+                    {formatCurrency(line.subprice)}
                   </td>
                   <td className="text-muted px-4 py-3 text-right">
                     {disabled ? (
@@ -451,7 +442,7 @@ export default function ProposalLines({
                     )}
                   </td>
                   <td className="text-foreground px-4 py-3 text-right font-medium">
-                    {formatEur(line.total_ht)}
+                    {formatCurrency(line.total_ht)}
                   </td>
                   {!disabled && (
                     <td className="px-4 py-3 text-center">
@@ -499,19 +490,19 @@ export default function ProposalLines({
           <div className="flex justify-between px-4 py-3 text-sm">
             <dt className="text-muted">Total HT</dt>
             <dd className="text-foreground font-medium" aria-live="polite">
-              {formatEur(totalHT)}
+              {formatCurrency(totalHT)}
             </dd>
           </div>
           <div className="flex justify-between px-4 py-3 text-sm">
             <dt className="text-muted">TVA</dt>
             <dd className="text-foreground font-medium" aria-live="polite">
-              {formatEur(totalTVA)}
+              {formatCurrency(totalTVA)}
             </dd>
           </div>
           <div className="flex justify-between px-4 py-3 text-sm font-semibold">
             <dt className="text-foreground">Total TTC</dt>
             <dd className="text-foreground" aria-live="polite">
-              {formatEur(totalTTC)}
+              {formatCurrency(totalTTC)}
             </dd>
           </div>
         </dl>
